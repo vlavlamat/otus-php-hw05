@@ -1,0 +1,42 @@
+services:
+  nginx-proxy:
+    image: otus-php-hw05/nginx-proxy:dev
+
+  nginx-backend1:
+    # Строим образ и монтируем тома ТОЛЬКО в первом backend-сервисе
+    # Этот образ будет использоваться всеми backend-репликами
+    image: otus-php-hw05/nginx-backend:dev
+    volumes:
+      - ./nginx/backend/conf.d:/etc/backend/conf.d:ro
+      - ./nginx/backend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./public:/app/public
+
+  nginx-backend2:
+    # Используем готовый образ без повторной сборки
+    # Без volumes, чтобы не создавать конфликтов в dev-окружении
+    image: otus-php-hw05/nginx-backend:dev
+
+  php-fpm1:
+    image: otus-php-hw05/php-fpm:dev
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./phpunit.xml:/app/phpunit.xml
+      - ./coverage:/app/coverage
+      - ./php/php.ini:/usr/local/etc/php/conf.d/local.ini
+    environment:
+      - COMPOSER_HOME=/var/www/.composer
+
+  php-fpm2:
+    image: otus-php-hw05/php-fpm:dev
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/vue.dev.Dockerfile
+    image: otus-php-hw05/vue-frontend:dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5174:5173"

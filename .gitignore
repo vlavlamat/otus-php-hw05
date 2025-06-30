@@ -10,6 +10,9 @@
 .idea/
 .vscode/
 
+# ▶️ Файлы Junie
+# .junie/
+
 # ▶️ PHPUnit
 .phpunit.result.cache
 coverage/
@@ -33,6 +36,7 @@ Thumbs.db
 desktop.ini
 
 # ▶️ Персональные и секретные конфиги
-.env
-.env.*
-
+env/.env
+env/.env.*
+!env/.env.dev.example
+!env/.env.prod.example
