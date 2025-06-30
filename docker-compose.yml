@@ -1,0 +1,75 @@
+services:
+  nginx-proxy:
+    build:
+      context: .
+      dockerfile: docker/proxy/proxy.Dockerfile
+    depends_on:
+      - nginx-backend1
+      - nginx-backend2
+      - frontend
+    ports:
+      - "8002:80"
+    networks:
+      - otus-hw05
+    container_name: nginx-proxy-hw05
+
+  nginx-backend1:
+    build:
+      context: .
+      dockerfile: docker/backend/backend.Dockerfile
+    networks:
+      - otus-hw05
+    volumes:
+      - php_fpm_socket1:/var/run/php
+    container_name: nginx-backend1-hw05
+
+  nginx-backend2:
+    build:
+      context: .
+      dockerfile: docker/backend/backend.Dockerfile
+    networks:
+      - otus-hw05
+    volumes:
+      - php_fpm_socket2:/var/run/php
+    container_name: nginx-backend2-hw05
+
+  php-fpm1:
+    build:
+      context: .
+      dockerfile: docker/php/php.Dockerfile
+    networks:
+      - otus-hw05
+      - redis-cluster-net
+    volumes:
+      - php_fpm_socket1:/var/run/php
+    container_name: php-fpm1-hw05
+
+  php-fpm2:
+    build:
+      context: .
+      dockerfile: docker/php/php.Dockerfile
+    networks:
+      - otus-hw05
+      - redis-cluster-net
+    volumes:
+      - php_fpm_socket2:/var/run/php
+    container_name: php-fpm2-hw05
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/vue.prod.Dockerfile
+    networks:
+      - otus-hw05
+    container_name: vue-frontend-hw05
+
+networks:
+  otus-hw05:
+    driver: bridge
+
+  redis-cluster-net:
+    external: true
+
+volumes:
+  php_fpm_socket1:
+  php_fpm_socket2:

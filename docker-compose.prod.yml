@@ -1,0 +1,28 @@
+services:
+  nginx-proxy:
+    image: vlavlamat/nginx-proxy-hw05:prod
+    restart: always
+
+  nginx-backend1:
+    image: vlavlamat/nginx-backend-hw05:prod
+    restart: always
+
+  nginx-backend2:
+    image: vlavlamat/nginx-backend-hw05:prod
+    restart: always
+
+  php-fpm1:
+    image: vlavlamat/php-fpm-hw05:prod
+    env_file:
+      - env/.env.prod
+    restart: always
+
+  php-fpm2:
+    image: vlavlamat/php-fpm-hw05:prod
+    env_file:
+      - env/.env.prod
+    restart: always
+
+  frontend:
+    image: vlavlamat/vue-frontend-hw05:prod
+    restart: always
