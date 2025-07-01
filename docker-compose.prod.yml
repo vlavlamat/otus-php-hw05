@@ -14,13 +14,13 @@ services:
   php-fpm1:
     image: vlavlamat/php-fpm-hw05:prod
     env_file:
-      - env/.env.prod
+      - .env.prod
     restart: always
 
   php-fpm2:
     image: vlavlamat/php-fpm-hw05:prod
     env_file:
-      - env/.env.prod
+      - .env.prod
     restart: always
 
   frontend:
