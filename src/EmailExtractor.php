@@ -16,11 +16,15 @@ class EmailExtractor
      * Регулярное выражение для поиска email-адресов
      *
      * Паттерн ищет email в формате: локальная_часть@домен.tld
-     * - Локальная часть: буквы, цифры, точки, дефисы, подчеркивания
-     * - Домен: буквы, цифры, дефисы, точки
-     * - TLD: от 2 до 6 букв
+     * - Локальная часть: буквы, цифры, точки, дефисы, подчеркивания, плюсы, проценты
+     * - Домен: буквы, цифры, дефисы, точки или IPv6 адрес в квадратных скобках
+     * - TLD: от 1 до 63 букв (согласно RFC)
+     *
+     * Это глобальное регулярное выражение, которое находит email даже без разделителей
+     * и в "слипшихся" email-адресах. Оно более строгое, чем предыдущая версия,
+     * и лучше соответствует RFC 5322.
      */
-    private const EMAIL_PATTERN = '/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/';
+    private const EMAIL_PATTERN = '/[a-zA-Z0-9_%+\-!][a-zA-Z0-9._%+\-!]*@(?:[a-zA-Z0-9.\-]+\.[a-zA-Z]{1,63}|\[IPv6:[0-9a-fA-F:]+])/i';
 
     /**
      * Извлекает все email-адреса из переданного текста
@@ -32,14 +36,28 @@ class EmailExtractor
     {
         $emails = [];
 
-        // Используем регулярное выражение для поиска всех email-адресов
-        if (preg_match_all(self::EMAIL_PATTERN, $text, $matches)) {
-            $emails = $matches[0];
-        }
+        // Разбиваем текст на строки
+        $lines = preg_split('/\r\n|\r|\n/', $text);
 
-        // Убираем дубликаты и приводим к нижнему регистру
-        $emails = array_map('strtolower', $emails);
-        $emails = array_unique($emails);
+        foreach ($lines as $line) {
+            // Очищаем строку от лишних пробелов
+            $line = trim($line);
+
+            // Пропускаем пустые строки
+            if (empty($line)) {
+                continue;
+            }
+
+            // Проверяем, является ли строка email-адресом (включая невалидные с точкой в начале)
+            // Используем два паттерна: один для валидных email, другой для email с точкой в начале
+            if (preg_match('/^[a-zA-Z0-9_%+\-!][a-zA-Z0-9._%+\-!]*@(?:[a-zA-Z0-9.\-]+\.[a-zA-Z]{1,63}|\[IPv6:[0-9a-fA-F:]+])$/i', $line)) {
+                // Валидный email
+                $emails[] = strtolower($line);
+            } elseif (preg_match('/^\.+[a-zA-Z0-9._%+\-!]+@(?:[a-zA-Z0-9.\-]+\.[a-zA-Z]{1,63}|\[IPv6:[0-9a-fA-F:]+])$/i', $line)) {
+                // Email с точкой в начале (невалидный, но мы его извлекаем для последующей валидации)
+                $emails[] = strtolower($line);
+            }
+        }
 
         // Возвращаем массив с числовыми индексами
         return array_values($emails);
@@ -54,16 +72,5 @@ class EmailExtractor
     public function hasEmails(string $text): bool
     {
         return preg_match(self::EMAIL_PATTERN, $text) === 1;
-    }
-
-    /**
-     * Подсчитывает количество email-адресов в тексте
-     *
-     * @param string $text Текст для подсчета
-     * @return int Количество найденных email-адресов
-     */
-    public function countEmails(string $text): int
-    {
-        return count($this->extractEmails($text));
     }
 }

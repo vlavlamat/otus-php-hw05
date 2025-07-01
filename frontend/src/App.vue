@@ -18,9 +18,12 @@
       </div>
     </div>
 
-    <!-- Кнопка отправки текста на проверку -->
-    <button class="submit-button" @click="validateEmail">Проверить email адреса</button>
-    
+    <!-- Кнопки управления -->
+    <div class="buttons-container">
+      <button class="clear-button" @click="clearTextInput">Очистить список</button>
+      <button class="submit-button" @click="validateEmail">Проверить email адреса</button>
+    </div>
+
     <!-- Только краткая статистика о проверке, если были результаты -->
     <div v-if="result" class="stats-container">
       <div class="stats-text" :class="answerClass">{{ result }}</div>
@@ -145,17 +148,23 @@ const handleApiError = (error) => {
 
 /**
  * Возвращает иконку и подробное описание для отображения статуса email
- * @param {string} status - Статус email (valid, invalid_format, invalid_mx, invalid_tld)
+ * @param {string} status - Статус email (valid, invalid)
  * @returns {string} Иконка со статусом и детальным пояснением
  */
 const getStatusIcon = (status) => {
   const statusMap = {
     'valid': '✅ валидный email',
-    'invalid_format': '❌ ошибка в формате email',
-    'invalid_mx': '❌ домен без почтового сервера',
-    'invalid_tld': '❌ неизвестный домен верхнего уровня'
+    'invalid': '❌ невалидный email'
   }
-  return statusMap[status] || '❓ статус не определен'
+  return statusMap[status] || '❌ невалидный email'
+}
+
+/**
+ * Очищает поле ввода текста
+ */
+const clearTextInput = () => {
+  textInput.value = '';
+  result.value = '';
 }
 
 /**
@@ -185,21 +194,136 @@ const validateEmail = async () => {
     })
 
     // Обрабатываем ответ
-    const emailResults = response.data.emails || []
+    const emailResults = response.data.data.emails || []
+
+    // Логируем для отладки
+    console.log('Email results:', emailResults)
 
     // Формируем сообщение о результате для краткой статистики
     if (emailResults.length === 0) {
       result.value = 'Email адреса не найдены.'
     } else {
-      const validCount = emailResults.filter(email => email.status === 'valid').length
-      result.value = `Найдено ${emailResults.length} email адресов, из них валидных: ${validCount}`
-      
-      // Формируем новый текст с результатами для textarea
-      let resultText = '';
-      emailResults.forEach(item => {
-        resultText += `${item.email} ${getStatusIcon(item.status)}\n`;
+      // Получаем уникальные валидные email-адреса
+      const uniqueValidEmails = new Set();
+      emailResults.forEach(email => {
+        if (email.status === 'valid') {
+          uniqueValidEmails.add(email.email.toLowerCase());
+        }
       });
-      
+
+      const validCount = uniqueValidEmails.size;
+      console.log('Valid count:', validCount)
+      console.log('Unique valid emails:', uniqueValidEmails)
+      result.value = `Найдено ${validCount} валидных email`
+
+      // Находим все email в исходном тексте и заменяем их на email с результатом проверки
+      let resultText = originalText.value;
+
+      // Сортируем результаты по длине email (от самых длинных к самым коротким)
+      // чтобы избежать проблем с заменой вложенных email
+      const sortedResults = [...emailResults].sort((a, b) => 
+        b.email.length - a.email.length
+      );
+
+      // Определяем фиксированную позицию для начала второго столбца
+      // Это обеспечит выравнивание всех статусов независимо от длины email
+      const COLUMN_WIDTH = 50; // Ширина первого столбца в символах
+
+      // Создаем таблицу с двумя колонками
+      // Первая колонка - email, вторая - статус
+      // Используем массив строк для хранения результатов
+
+      // Создаем массив строк из исходного текста
+      const lines = originalText.value.split('\n');
+
+      // Создаем Set для отслеживания уже обработанных email и строк
+      const processedEmails = new Set();
+      const processedLines = new Set();
+
+      // Обрабатываем каждый email из результатов
+      sortedResults.forEach(item => {
+        const lowerEmail = item.email.toLowerCase();
+
+        // Если этот email уже был обработан, пропускаем его
+        if (processedEmails.has(lowerEmail)) {
+          return;
+        }
+
+        // Добавляем email в список обработанных
+        processedEmails.add(lowerEmail);
+
+        // Ищем строки, содержащие этот email
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Используем более гибкий подход для поиска email в тексте
+          // Экранируем специальные символы в email для использования в регулярном выражении
+          const escapedEmail = item.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+          // 🎯 ИСПРАВЛЕНИЕ: Используем точное совпадение для всех email
+          // Используем флаг 'i' для регистронезависимого поиска
+          const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+
+          if (emailRegex.test(line)) {
+            // Заменяем строку на форматированную версию
+            // Первая колонка - email или текст, вторая колонка - статус
+            const firstColumn = item.email;
+            const secondColumn = getStatusIcon(item.status);
+
+            // Создаем строку с фиксированной шириной первой колонки
+            lines[i] = firstColumn.padEnd(COLUMN_WIDTH) + secondColumn;
+
+            // Отмечаем строку как обработанную
+            processedLines.add(i);
+          }
+        }
+      });
+
+      // Обрабатываем строки, которые не содержат обработанных email и не пустые
+      for (let i = 0; i < lines.length; i++) {
+        if (!processedLines.has(i) && lines[i].trim() !== '') {
+          // Проверяем, содержит ли строка уже статус
+          if (!lines[i].includes('✅ валидный email') && !lines[i].includes('❌ невалидный email')) {
+            // Проверяем, содержит ли строка email-подобный текст
+            // Обновленный паттерн, который также учитывает email с точкой в начале
+            const emailPattern = /\.?[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{1,63}/;
+            const lineText = lines[i].trim();
+
+            // Если строка содержит email-подобный текст, проверяем его через EmailValidator
+            if (emailPattern.test(lineText)) {
+              // Извлекаем email-подобный текст
+              const match = lineText.match(emailPattern);
+              if (match) {
+                const emailText = match[0];
+
+                // Проверяем, есть ли этот email в результатах валидации
+                // Используем только точное совпадение email-адресов
+                const validationResult = emailResults.find(result => {
+                  // 🎯 ИСПРАВЛЕНИЕ: Только точное совпадение email-адресов
+                  return result.email.toLowerCase() === emailText.toLowerCase();
+                });
+
+                if (validationResult) {
+                  // Если email найден в результатах, используем его статус
+                  lines[i] = emailText.padEnd(COLUMN_WIDTH) + getStatusIcon(validationResult.status);
+                } else {
+                  // Если email не найден в результатах, помечаем как невалидный
+                  lines[i] = lineText.padEnd(COLUMN_WIDTH) + '❌ невалидный email';
+                }
+              } else {
+                // Если не удалось извлечь email, помечаем как невалидный
+                lines[i] = lineText.padEnd(COLUMN_WIDTH) + '❌ невалидный email';
+              }
+            } else {
+              // Если строка не содержит email-подобный текст, помечаем как невалидный
+              lines[i] = lineText.padEnd(COLUMN_WIDTH) + '❌ невалидный email';
+            }
+          }
+        }
+      }
+
+      // Объединяем строки обратно в текст
+      resultText = lines.join('\n');
+
       // Заменяем текст в textarea
       textInput.value = resultText;
     }
@@ -274,7 +398,7 @@ const redisStatusText = computed(() => {
 <style scoped>
 /* Основной контейнер приложения */
 .container {
-  max-width: 700px; /* увеличиваем ширину для email */
+  max-width: 820px; /* увеличиваем ширину на ~17% для лучшего отображения email */
   margin: 3rem auto; /* отступ сверху/снизу и автоцентрирование */
   padding: 2rem; /* внутренние отступы */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; /* современный шрифт */
@@ -375,15 +499,33 @@ button:hover:enabled {
   transform: translateY(-1px);
 }
 
+/* Стили для кнопки "Очистить список" при наведении */
+.clear-button:hover:enabled {
+  background-color: #bd2130; /* темно-красный цвет */
+}
+
 /* Стили кнопок при нажатии */
 button:active:enabled {
   transform: translateY(0);
 }
 
+/* Контейнер для кнопок */
+.buttons-container {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
 /* Стили для кнопки "Проверить" */
 .submit-button {
-  width: 100%;
-  margin-top: 0.5rem;
+  flex: 1;
+  background-color: #007bff; /* синий цвет */
+}
+
+/* Стили для кнопки "Очистить список" */
+.clear-button {
+  flex: 1;
+  background-color: #dc3545; /* красный цвет */
 }
 
 /* Контейнер для краткой статистики */

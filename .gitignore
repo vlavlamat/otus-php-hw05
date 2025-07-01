@@ -17,6 +17,11 @@
 .phpunit.result.cache
 coverage/
 
+
+# ▶️ Временные тестовые файлы
+/test_*.php
+/test_*.html
+
 # ▶️ Логи и временные файлы
 *.log
 *.cache

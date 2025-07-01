@@ -67,14 +67,4 @@ class ValidationRequest
     {
         return $validatedData['data']['text'] ?? '';
     }
-
-    /**
-     * Получает максимальную длину текста
-     *
-     * @return int Максимальная длина
-     */
-    public function getMaxTextLength(): int
-    {
-        return self::MAX_TEXT_LENGTH;
-    }
 }

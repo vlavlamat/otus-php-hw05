@@ -1,8 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
-
 namespace App;
+
+use Exception;
+use Throwable;
 
 /**
  * Класс EmailController
@@ -58,7 +61,7 @@ class EmailController
             $validation = $this->validationRequest->validate($inputData);
 
             if (!$validation['valid']) {
-                $this->sendError($validation['errors'], 400);
+                $this->sendError($validation['errors']);
                 return;
             }
 
@@ -89,7 +92,7 @@ class EmailController
                 'statistics' => $this->getStatistics($validationResults)
             ]);
 
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             $this->sendError('Внутренняя ошибка сервера', 500);
         }
     }
@@ -98,20 +101,20 @@ class EmailController
      * Получает данные из HTTP-запроса
      *
      * @return array Данные запроса
-     * @throws \Exception Если данные не могут быть получены
+     * @throws Exception Если данные не могут быть получены
      */
     private function getRequestData(): array
     {
         $rawInput = file_get_contents('php://input');
 
         if ($rawInput === false) {
-            throw new \Exception('Не удалось получить данные запроса');
+            throw new Exception('Не удалось получить данные запроса');
         }
 
         $data = json_decode($rawInput, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Некорректный JSON в запросе');
+            throw new Exception('Некорректный JSON в запросе');
         }
 
         return $data ?? [];
@@ -135,11 +138,11 @@ class EmailController
     /**
      * Отправляет ответ с ошибкой
      *
-     * @param string|array $message Сообщение об ошибке
+     * @param array|string $message Сообщение об ошибке
      * @param int $code HTTP-код ошибки
      * @return void
      */
-    private function sendError($message, int $code = 400): void
+    private function sendError(array|string $message, int $code = 400): void
     {
         http_response_code($code);
         echo json_encode([
@@ -152,15 +155,13 @@ class EmailController
      * Вычисляет статистику по результатам валидации
      *
      * @param array $results Результаты валидации
-     * @return array Статистика
+     * @return array Статистика (упрощенная версия: только valid/invalid)
      */
     private function getStatistics(array $results): array
     {
         $stats = [
             'valid' => 0,
-            'invalid_format' => 0,
-            'invalid_mx' => 0,
-            'invalid_tld' => 0
+            'invalid' => 0
         ];
 
         foreach ($results as $result) {
