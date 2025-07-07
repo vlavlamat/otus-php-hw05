@@ -17,32 +17,38 @@ $testEmails = [
     'test@gmail.com',
     'user@yahoo.com',
     'contact@microsoft.com',
-    
+
     // Invalid format (syntax errors)
     'invalid-email-no-at.com',
     'user@@double-at.com',
     '.starting.dot@domain.com',
     'ending.dot.@domain.com',
     'double..dot@domain.com',
-    
+
     // Invalid TLD (non-existent TLD)
     'user@domain.invalidtld',
     'test@site.fakeext',
-    
+
     // Invalid MX (valid format and TLD but no MX record)
     'user@example.com',
     'test@nonexistentdomain12345.com',
-    
+
     // IPv6 addresses (should be valid)
     'user@[IPv6:2001:db8::1]',
     'test@[ipv6:fe80::1]',
-    
+
     // Modern long TLD (should work if MX exists)
     'contact@example.technology',
 ];
 
-$validator = new EmailValidator();
-$results = $validator->validate($testEmails);
+$validator = EmailValidator::createDefault();
+
+// Process each email individually
+$results = [];
+foreach ($testEmails as $email) {
+    $result = $validator->validate($email);
+    $results[] = $result->toArray();
+}
 
 // Group results by status
 $groupedResults = [
@@ -62,7 +68,7 @@ foreach ($results as $result) {
 // Display results grouped by status
 foreach ($groupedResults as $status => $emails) {
     if (empty($emails)) continue;
-    
+
     $statusIcon = $status === 'valid' ? '✅' : '❌';
     $statusName = match($status) {
         'valid' => 'VALID EMAILS',
@@ -70,7 +76,7 @@ foreach ($groupedResults as $status => $emails) {
         'invalid_tld' => 'INVALID TLD (Not in IANA list)',
         'invalid_mx' => 'INVALID MX (No MX record found)'
     };
-    
+
     echo "{$statusIcon} {$statusName}:\n";
     foreach ($emails as $email) {
         echo "  • {$email['email']} - {$email['reason']}\n";
@@ -97,11 +103,13 @@ echo "Total invalid: " . ($stats['invalid_format'] + $stats['invalid_tld'] + $st
 
 echo "=== FEATURE VERIFICATION ===\n";
 
-// Test TLD loading
-$reflectionClass = new ReflectionClass($validator);
+// Test TLD loading by accessing the TldValidator
+$validators = $validator->getValidators();
+$tldValidator = $validators['tld'];
+$reflectionClass = new ReflectionClass($tldValidator);
 $validTldsProperty = $reflectionClass->getProperty('validTlds');
 $validTldsProperty->setAccessible(true);
-$validTlds = $validTldsProperty->getValue();
+$validTlds = $validTldsProperty->getValue($tldValidator);
 
 if ($validTlds !== null && count($validTlds) > 1000) {
     echo "✅ IANA TLD list loaded successfully (" . count($validTlds) . " TLDs)\n";
@@ -134,8 +142,8 @@ $rfc5322TestEmails = [
 
 $rfc5322Valid = 0;
 foreach ($rfc5322TestEmails as $email) {
-    $result = $validator->validate([$email]);
-    if (!empty($result) && $result[0]['status'] !== 'invalid_format') {
+    $result = $validator->validate($email);
+    if ($result->status !== 'invalid_format') {
         $rfc5322Valid++;
     }
 }

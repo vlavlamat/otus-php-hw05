@@ -30,7 +30,7 @@ return [
         // Настройки для сессий
         'session' => [
             // Префикс для ключей сессий
-            'prefix' => $_ENV['REDIS_SESSION_PREFIX'] ?? 'otus_hw04:',
+            'prefix' => $_ENV['REDIS_SESSION_PREFIX'] ?? 'otus_hw05:',
 
             // Время жизни сессии в секундах (по умолчанию 24 ЧАСА)
             'gc_maxlifetime' => (int)($_ENV['REDIS_SESSION_LIFETIME'] ?? 86400),
