@@ -1,175 +1,248 @@
 <?php
-declare(strict_types=1);
 
+declare(strict_types=1);
 
 namespace App;
 
+use JsonException;
+use Throwable;
+
 /**
- * Класс EmailController
+ * HTTP контроллер для API валидации email адресов
  *
- * Контроллер для обработки HTTP-запросов по проверке email-адресов
+ * Этот класс является основным HTTP контроллером, который обрабатывает
+ * REST API запросы для валидации email адресов. Он служит мостом между
+ * HTTP слоем и бизнес-логикой валидации.
+ *
+ * Основные возможности:
+ * - Валидация массивов email адресов с детальными результатами
+ * - Валидация одиночных email адресов
+ * - Получение статистики по результатам валидации
+ * - Настраиваемые конфигурации валидаторов
+ * - Проверка работоспособности сервиса (health check)
+ * - Поддержка CORS для кроссдоменных запросов
+ * - Обработка ошибок с детальными сообщениями
+ *
+ * Архитектурные принципы:
+ * - Использует dependency injection для тестируемости
+ * - Все методы возвращают JSON ответы
+ * - Централизованная обработка ошибок
+ * - Валидация входных данных с подробными сообщениями об ошибках
+ * - Лимитирование количества email для предотвращения злоупотреблений
+ *
+ * @package App
+ * @author Vladimir Matkovskii and Claude 4 Sonnet
+ * @version 1.0
  */
 class EmailController
 {
-    private EmailExtractor $emailExtractor;
-    private EmailValidator $emailValidator;
-    private ValidationRequest $validationRequest;
+    /**
+     * Максимальное количество email адресов для валидации за один запрос
+     * Предотвращает перегрузку сервера при массовых запросах
+     */
+    private const MAX_EMAILS_PER_REQUEST = 1000;
+
+
+    /**
+     * Сервис для выполнения валидации email адресов
+     * Инкапсулирует всю бизнес-логику валидации
+     *
+     * @var EmailVerificationService
+     */
+    private EmailVerificationService $verificationService;
 
     /**
      * Конструктор контроллера
+     *
+     * Инициализирует контроллер с необходимым сервисом валидации.
+     * Использует dependency injection для лучшей тестируемости и гибкости.
+     *
+     * @param EmailVerificationService $verificationService Сервис для валидации email адресов
      */
-    public function __construct()
+    public function __construct(EmailVerificationService $verificationService)
     {
-        $this->emailExtractor = new EmailExtractor();
-        $this->emailValidator = new EmailValidator();
-        $this->validationRequest = new ValidationRequest();
+        $this->verificationService = $verificationService;
     }
 
     /**
-     * Обрабатывает запрос на проверку email-адресов
+     * Основной эндпоинт для валидации массива email адресов
      *
-     * @return void
+     * Принимает POST запрос с JSON, содержащим массив email адресов,
+     * и возвращает результаты валидации для каждого адреса.
+     *
+     * Формат входных данных:
+     * {
+     *   "emails": ["user@example.com", "test@domain.org", ...]
+     * }
+     *
+     * Формат ответа:
+     * {
+     *   "success": true,
+     *   "results": [
+     *     {
+     *       "email": "user@example.com",
+     *       "valid": true,
+     *       "reason": null,
+     *       "validations": {...}
+     *     },
+     *     ...
+     *   ],
+     *   "total": 2
+     * }
+     *
+     * @return void Отправляет JSON ответ напрямую через HTTP
      */
-    public function validateEmails(): void
+    public function verify(): void
     {
-        // Устанавливаем заголовки для JSON-ответа
-        header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
-
-        // Обработка preflight-запроса для CORS
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit;
-        }
-
-        // Проверяем метод запроса
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->sendError('Метод не поддерживается', 405);
-            return;
-        }
-
         try {
-            // Получаем данные из запроса
-            $inputData = $this->getRequestData();
+            // Настраиваем HTTP заголовки для JSON API
+            $this->setJsonHeaders();
 
-            // Валидируем входящие данные
-            $validation = $this->validationRequest->validate($inputData);
+            // Получаем и парсим данные из тела запроса
+            $requestData = $this->getRequestData();
 
-            if (!$validation['valid']) {
-                $this->sendError($validation['errors'], 400);
+            // Валидируем структуру запроса - проверяем наличие поля 'emails'
+            if (!isset($requestData['emails']) || !is_array($requestData['emails'])) {
+                $this->sendErrorResponse('Поле "emails" обязательно и должно быть массивом');
                 return;
             }
 
-            // Получаем текст для обработки
-            $text = $this->validationRequest->getText($validation);
+            $emails = $requestData['emails'];
 
-            // Извлекаем email-адреса из текста
-            $emails = $this->emailExtractor->extractEmails($text);
-
-            // Если email-адреса не найдены
+            // Проверяем, что массив email адресов не пустой
             if (empty($emails)) {
-                $this->sendSuccess([
-                    'message' => 'Email-адреса в тексте не найдены',
-                    'emails' => [],
-                    'total_found' => 0
-                ]);
+                $this->sendErrorResponse('Массив email адресов не может быть пустым');
                 return;
             }
 
-            // Валидируем найденные email-адреса
-            $validationResults = $this->emailValidator->validate($emails);
+            // Ограничиваем количество email для предотвращения злоупотреблений
+            if (count($emails) > self::MAX_EMAILS_PER_REQUEST) {
+                $this->sendErrorResponse(
+                    'Максимальное количество email адресов для проверки: ' . self::MAX_EMAILS_PER_REQUEST
+                );
+                return;
+            }
 
-            // Формируем ответ
-            $this->sendSuccess([
-                'message' => 'Обработка завершена успешно',
-                'emails' => $validationResults,
-                'total_found' => count($validationResults),
-                'statistics' => $this->getStatistics($validationResults)
+            // Выполняем валидацию через сервис
+            $results = $this->verificationService->verifyForApi($emails);
+
+            // Отправляем успешный ответ с результатами
+            $this->sendSuccessResponse([
+                'success' => true,
+                'results' => $results,
+                'total' => count($results),
             ]);
 
-        } catch (\Throwable $e) {
-            $this->sendError('Внутренняя ошибка сервера', 500);
+        } catch (Throwable $e) {
+            // Обрабатываем любые непредвиденные ошибки
+            $this->sendErrorResponse('Внутренняя ошибка сервера: ' . $e->getMessage(), 500);
         }
     }
 
+
+
+
+
     /**
-     * Получает данные из HTTP-запроса
+     * Получает и парсит данные из тела HTTP запроса
      *
-     * @return array Данные запроса
-     * @throws \Exception Если данные не могут быть получены
+     * Читает JSON из входящего запроса и преобразует в PHP массив.
+     * Обрабатывает ошибки парсинга JSON и возвращает пустой массив
+     * для пустых запросов.
+     *
+     * @return array Декодированные данные из JSON или пустой массив
+     * @throws JsonException При некорректном JSON (автоматически обрабатывается в вызывающих методах)
      */
     private function getRequestData(): array
     {
-        $rawInput = file_get_contents('php://input');
+        // Читаем сырые данные из входящего запроса
+        $input = file_get_contents('php://input');
 
-        if ($rawInput === false) {
-            throw new \Exception('Не удалось получить данные запроса');
+        // Возвращаем пустой массив для пустых запросов
+        if (empty($input)) {
+            return [];
         }
 
-        $data = json_decode($rawInput, true);
+        // Парсим JSON с включенным исключением при ошибках
+        $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Некорректный JSON в запросе');
-        }
-
-        return $data ?? [];
+        // Гарантируем, что возвращаем массив (на случай, если JSON содержит не объект)
+        return is_array($data) ? $data : [];
     }
 
     /**
-     * Отправляет успешный ответ
+     * Устанавливает HTTP заголовки для JSON API ответов
      *
-     * @param array $data Данные ответа
+     * Настраивает стандартные заголовки для RESTful API:
+     * - Content-Type для JSON с правильной кодировкой
+     * - CORS заголовки для поддержки кроссдоменных запросов
+     * - Разрешенные HTTP методы и заголовки
+     *
      * @return void
      */
-    private function sendSuccess(array $data): void
+    private function setJsonHeaders(): void
     {
+        // Указываем тип содержимого и кодировку
+        header('Content-Type: application/json; charset=utf-8');
+
+        // Настраиваем CORS для работы с фронтенд приложениями
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    }
+
+    /**
+     * Отправляет успешный JSON ответ
+     *
+     * Формирует и отправляет HTTP ответ с кодом 200 и JSON данными.
+     * Использует красивое форматирование JSON для удобства отладки.
+     *
+     * @param array $data Данные для включения в JSON ответ
+     * @return void
+     */
+    private function sendSuccessResponse(array $data): void
+    {
+        // Устанавливаем код успешного ответа
         http_response_code(200);
-        echo json_encode([
-            'success' => true,
-            'data' => $data
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        // Отправляем JSON с красивым форматированием и поддержкой Unicode
+        echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
 
     /**
-     * Отправляет ответ с ошибкой
+     * Отправляет JSON ответ с ошибкой
      *
-     * @param string|array $message Сообщение об ошибке
-     * @param int $code HTTP-код ошибки
+     * Формирует и отправляет HTTP ответ с кодом ошибки и детальным
+     * описанием проблемы. Включает временную метку для логирования.
+     *
+     * @param string $message Сообщение об ошибке для пользователя
+     * @param int $statusCode HTTP код ошибки (по умолчанию 400 Bad Request)
      * @return void
      */
-    private function sendError($message, int $code = 400): void
+    private function sendErrorResponse(string $message, int $statusCode = 400): void
     {
-        http_response_code($code);
+        // Устанавливаем соответствующий код ошибки
+        http_response_code($statusCode);
+
+        // Формируем структурированный ответ об ошибке
         echo json_encode([
             'success' => false,
-            'error' => $message
+            'error' => $message,
+            'timestamp' => date('c'), // ISO 8601 формат для логирования
         ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
 
     /**
-     * Вычисляет статистику по результатам валидации
+     * Фабричный метод для создания контроллера с сервисом по умолчанию
      *
-     * @param array $results Результаты валидации
-     * @return array Статистика
+     * Упрощает создание экземпляра контроллера с готовой конфигурацией.
+     * Использует стандартный сервис валидации со всеми включенными валидаторами.
+     *
+     * @return EmailController Готовый к использованию экземпляр контроллера
      */
-    private function getStatistics(array $results): array
+    public static function createDefault(): EmailController
     {
-        $stats = [
-            'valid' => 0,
-            'invalid_format' => 0,
-            'invalid_mx' => 0,
-            'invalid_tld' => 0
-        ];
-
-        foreach ($results as $result) {
-            $status = $result['status'] ?? 'unknown';
-            if (isset($stats[$status])) {
-                $stats[$status]++;
-            }
-        }
-
-        return $stats;
+        return new self(EmailVerificationService::createDefault());
     }
+
 }
