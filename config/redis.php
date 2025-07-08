@@ -47,5 +47,10 @@ return [
 
         // Таймаут для ping-запросов в секундах
         'ping_timeout' => (int)($_ENV['REDIS_PING_TIMEOUT'] ?? 2)
+    ],
+    // Настройки для TLD кэширования
+    'tld_cache' => [
+        'ttl' => (int)($_ENV['REDIS_TLD_CACHE_TTL'] ?? 86400),
+        'prefix' => $_ENV['REDIS_TLD_CACHE_PREFIX'] ?? 'tld_cache:'
     ]
 ];

@@ -1,4 +1,4 @@
-# ▶️ Composer
+# Composer
 /vendor/
 /.composer/cache/
 
@@ -15,47 +15,50 @@ dist/
 .env.local
 .env.*.local
 
-# ▶️ Docker
+# Docker
 /docker/*.log
 *.pid
 
-# ▶️ IDE / Редакторы
+# IDE / Редакторы
 .idea/
 .vscode/
 
-# ▶️ Файлы Junie
+# Файлы Junie
 # .junie/
 
-# ▶️ PHPUnit
+# PHPUnit
 .phpunit.result.cache
 coverage/
 
 
-# ▶️ Временные тестовые файлы
+# Временные тестовые файлы
 /test_*.php
 /test_*.html
 
-# ▶️ Логи и временные файлы
+# Логи и временные файлы
 *.log
 *.cache
 *.tmp
 *.old
-cache/
 
-# ▶️ MacOS
+# MacOS
 .DS_Store
 .AppleDouble
 .LSOverride
 
-# ▶️ Linux
+# Linux
 *~
 
-# ▶️ Windows
+# Windows
 Thumbs.db
 desktop.ini
 
-# ▶️ Персональные и секретные конфиги
+# Персональные и секретные конфиги
 env/.env
 env/.env.*
 !env/.env.dev.example
 !env/.env.prod.example
+
+# Временные файлы кеширования Redis Cluster
+TTL
+EXISTS
