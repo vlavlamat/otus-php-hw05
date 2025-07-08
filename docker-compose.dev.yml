@@ -21,6 +21,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
+      - ./scripts:/app/scripts
       - ./phpunit.xml:/app/phpunit.xml
       - ./coverage:/app/coverage
       - ./php/php.ini:/usr/local/etc/php/conf.d/local.ini

@@ -7,72 +7,95 @@ namespace App\Validators;
 use App\Interfaces\ValidatorInterface;
 use App\Interfaces\DomainValidatorInterface;
 use App\ValidationResult;
+use App\Cache\RedisCacheAdapter;
+use Exception;
 
 /**
- * Валидатор TLD (Top Level Domain) email адресов
+ * Валидатор TLD (Top Level Domain) email адресов с Redis кэшированием
  *
  * Проверяет доменную часть email адреса на соответствие официальному списку
  * доменов верхнего уровня, поддерживаемых IANA (Internet Assigned Numbers Authority).
  *
  * Особенности работы:
  * - Загружает актуальный список TLD с официального сайта IANA
- * - Кэширует данные для повышения производительности
- * - Имеет резервный список TLD на случай недоступности IANA
+ * - Кэширует данные в Redis Cluster для высокой производительности
+ * - Имеет резервный список TLD на случай недоступности IANA и Redis
  * - Поддерживает как новое API (validateDomain), так и старое (validate)
+ * - Использует распределенный кэш между всеми инстансами приложения
  *
  * @package App\Validators
  * @author Vladimir Matkovskii and Claude 4 Sonnet
- * @version 1.0
+ * @version 3.0
  */
 class TldValidator implements ValidatorInterface, DomainValidatorInterface
 {
     /**
      * URL для загрузки официального списка TLD от IANA
-     * Этот список обновляется IANA по мере добавления новых доменов
      */
     private const IANA_TLD_URL = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt';
 
     /**
-     * Путь к файлу кэша для хранения списка TLD
-     * Используется для избежания повторных запросов к IANA
+     * Ключ для хранения списка TLD в Redis кэше
      */
-    private const TLD_CACHE_FILE = __DIR__ . '/../../cache/tlds.txt';
+    private const REDIS_TLD_CACHE_KEY = 'tlds_list';
+
+    /**
+     * Ключ для хранения метаданных о кэше (время загрузки, версия и т.д.)
+     */
+    private const REDIS_TLD_METADATA_KEY = 'tlds_metadata';
 
     /**
      * Время жизни кэша в секундах (24 часа)
-     * После истечения этого времени кэш считается устаревшим
      */
     private const CACHE_DURATION = 24 * 60 * 60;
 
     /**
      * Таймаут для HTTP запросов к IANA в секундах
-     * Предотвращает зависание при медленном соединении
      */
     private const HTTP_TIMEOUT = 10;
 
     /**
      * User-Agent для HTTP запросов
-     * Идентифицирует наше приложение в логах IANA
      */
-    private const USER_AGENT = 'EmailValidator/1.0 (TLD Checker)';
+    private const USER_AGENT = 'EmailValidator/3.0 (TLD Checker with Redis)';
 
     /**
      * Массив валидных TLD в верхнем регистре
-     * Загружается при инициализации класса
      *
      * @var array<string> Список валидных TLD
      */
     private array $validTlds = [];
 
     /**
+     * Адаптер Redis кэша
+     */
+    private readonly ?RedisCacheAdapter $cache;
+
+    /**
      * Конструктор класса
      *
-     * Автоматически загружает список валидных TLD при создании экземпляра класса.
-     * Сначала пытается загрузить из кэша, затем с IANA, в крайнем случае - резервный список.
+     * Создание Redis адаптера согласно алгоритму:
+     * - Подключение к Redis Cluster
+     * - Настройка префикса ключей: tld_cache:
+     *
+     * @param RedisCacheAdapter|null $cache Адаптер Redis кэша (для DI и тестирования)
      */
-    public function __construct()
+    public function __construct(?RedisCacheAdapter $cache = null)
     {
-        // Инициализируем список TLD при создании объекта
+        // Автоматически создаем Redis адаптер если не передан (согласно алгоритму)
+        if ($cache === null) {
+            try {
+                $this->cache = new RedisCacheAdapter();
+            } catch (Exception $e) {
+                // Если Redis недоступен, продолжаем без кэша
+                error_log("Redis cache unavailable during TldValidator initialization: " . $e->getMessage());
+                $this->cache = null;
+            }
+        } else {
+            $this->cache = $cache;
+        }
+
+        // Загружаем список TLD при создании объекта
         $this->loadValidTlds();
     }
 
@@ -80,7 +103,7 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
      * Валидирует доменную часть email на соответствие официальному списку TLD
      *
      * Это основной метод для нового API. Принимает уже извлеченную доменную часть
-     * и проверяет её TLD против списка IANA.
+     * и проверяет её соответствие официальному списку доменов верхнего уровня IANA.
      *
      * @param string $domain Доменная часть email (например, "example.com")
      * @param string $fullEmail Полный email адрес для контекста в сообщениях об ошибках
@@ -88,15 +111,12 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
      */
     public function validateDomain(string $domain, string $fullEmail): ValidationResult
     {
-        // Проверяем, что домен не пустой
         if (empty(trim($domain))) {
             return ValidationResult::invalidTld($fullEmail, 'Доменная часть email не может быть пустой');
         }
 
-        // Извлекаем TLD (домен верхнего уровня) из доменной части
         $tld = $this->extractTld($domain);
 
-        // Проверяем, удалось ли извлечь TLD
         if (empty($tld)) {
             return ValidationResult::invalidTld(
                 $fullEmail,
@@ -104,7 +124,6 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
             );
         }
 
-        // Проверяем валидность TLD против списка IANA
         if (!$this->isTldValid($tld)) {
             return ValidationResult::invalidTld(
                 $fullEmail,
@@ -113,7 +132,6 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
             );
         }
 
-        // Все проверки пройдены успешно
         return ValidationResult::valid($fullEmail);
     }
 
@@ -128,82 +146,62 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
      */
     public function validate(string $email): ValidationResult
     {
-        // Базовая проверка формата email
-        if (empty(trim($email))) {
+        $trimmedEmail = trim($email);
+        if (empty($trimmedEmail)) {
             return ValidationResult::invalidTld($email, 'Email адрес не может быть пустым');
         }
 
-        // Проверяем наличие символа @ (простая проверка формата)
-        if (substr_count($email, '@') !== 1) {
+        $atCount = substr_count($email, '@');
+        if ($atCount !== 1) {
             return ValidationResult::invalidTld($email, 'Email должен содержать ровно один символ @');
         }
 
-        // Извлекаем доменную часть из email (часть после @)
         [, $domainPart] = explode('@', $email, 2);
-
-        // Делегируем валидацию основному методу
         return $this->validateDomain($domainPart, $email);
     }
 
     /**
-     * Извлекает TLD (домен верхнего уровня) из доменной части
+     * Извлекает TLD из доменной части
      *
-     * Принимает доменную часть (например, "subdomain.example.com") и возвращает
-     * TLD в верхнем регистре (например, "COM").
-     *
-     * @param string $domain Доменная часть для извлечения TLD
-     * @return string Извлеченный TLD в верхнем регистре
+     * @param string $domain Доменная часть email
+     * @return string TLD в верхнем регистре
      */
     private function extractTld(string $domain): string
     {
-        // Разбиваем домен по точкам
         $parts = explode('.', trim($domain));
-
-        // Получаем последнюю часть (это и есть TLD)
-        $tld = end($parts);
-
-        // Возвращаем TLD в верхнем регистре для унификации
-        return strtoupper($tld);
+        return strtoupper(array_slice($parts, -1)[0] ?? '');
     }
 
     /**
-     * Проверяет, является ли TLD валидным согласно списку IANA
+     * Проверяет валидность TLD согласно списку IANA
      *
-     * Выполняет поиск TLD в предварительно загруженном списке валидных доменов.
-     * Сравнение происходит без учета регистра.
-     *
-     * @param string $tld TLD для проверки (например, "COM", "RU", "NET")
-     * @return bool true если TLD найден в списке IANA, false - если нет
+     * @param string $tld TLD для проверки
+     * @return bool true если TLD валиден
      */
     private function isTldValid(string $tld): bool
     {
-        // Приводим TLD к верхнему регистру и ищем в массиве
-        // Используем строгое сравнение (strict mode) для точности
         return in_array(strtoupper($tld), $this->validTlds, true);
     }
 
     /**
-     * Основной метод загрузки списка валидных TLD
+     * Основной метод загрузки списка валидных TLD с поддержкой Redis кэша
      *
-     * Реализует стратегию загрузки с fallback:
-     * 1. Сначала пытается загрузить из кэша
-     * 2. Если кэш недоступен или устарел - загружает с IANA
-     * 3. Если IANA недоступна - использует резервный список
-     *
-     * @return void
+     * Пытается загрузить список TLD в следующем порядке:
+     * 1. Из Redis кэша (если доступен)
+     * 2. С официального сайта IANA
+     * 3. Использует встроенный резервный список
      */
     private function loadValidTlds(): void
     {
-        // Этап 1: Попытка загрузки из кэша
-        if ($this->loadFromCache()) {
-            // Кэш успешно загружен, выходим
+        // Этап 1: Попытка загрузки из Redis кэша
+        if ($this->loadFromRedisCache()) {
             return;
         }
 
         // Этап 2: Попытка загрузки с IANA
         if ($this->loadFromIana()) {
-            // Данные загружены с IANA, сохраняем в кэш для будущих использований
-            $this->saveToCache();
+            // Сохраняем в Redis кэш для будущих использований
+            $this->saveToRedisCache();
             return;
         }
 
@@ -212,58 +210,58 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
     }
 
     /**
-     * Загружает список TLD из файла кэша
+     * Загружает список TLD из Redis кэша
      *
-     * Проверяет существование файла кэша, его актуальность и загружает данные.
-     * Если кэш устарел или поврежден - возвращает false.
+     * Проверяет наличие кэшированного списка TLD в Redis и загружает его.
+     * Также загружает метаданные о кэше для логирования.
      *
-     * @return bool true если кэш успешно загружен, false - если кэш недоступен или устарел
+     * @return bool true если кэш успешно загружен
      */
-    private function loadFromCache(): bool
+    private function loadFromRedisCache(): bool
     {
-        // Проверяем существование файла кэша
-        if (!file_exists(self::TLD_CACHE_FILE)) {
+        if (!$this->cache?->exists(self::REDIS_TLD_CACHE_KEY)) {
+            return false; // Redis недоступен или кэш не существует
+        }
+
+        try {
+            // Загружаем данные из кэша
+            $cachedTlds = $this->cache->get(self::REDIS_TLD_CACHE_KEY);
+            $metadata = $this->cache->get(self::REDIS_TLD_METADATA_KEY);
+
+            // Проверяем валидность загруженных данных
+            if (!is_array($cachedTlds) || empty($cachedTlds)) {
+                return false;
+            }
+
+            // Проверяем метаданные с использованием современного синтаксиса
+            if (is_array($metadata)) {
+                $loadedAt = $metadata['loaded_at'] ?? 0;
+                $version = $metadata['version'] ?? 'unknown';
+                $tldCount = count($cachedTlds);
+                $loadedTime = date('Y-m-d H:i:s', $loadedAt);
+
+                error_log("TLD cache loaded from Redis: $version, $tldCount TLDs, loaded at $loadedTime");
+            }
+
+            $this->validTlds = $cachedTlds;
+            return true;
+
+        } catch (Exception $e) {
+            error_log("Error loading TLD cache from Redis: " . $e->getMessage());
             return false;
         }
-
-        // Получаем время последнего изменения файла
-        $cacheTime = filemtime(self::TLD_CACHE_FILE);
-
-        // Вычисляем время истечения кэша
-        $expiryTime = time() - self::CACHE_DURATION;
-
-        // Проверяем, не устарел ли кэш
-        if ($cacheTime < $expiryTime) {
-            return false; // Кэш устарел
-        }
-
-        // Читаем содержимое файла кэша
-        $content = file_get_contents(self::TLD_CACHE_FILE);
-        if ($content === false) {
-            return false; // Ошибка чтения файла
-        }
-
-        // Разбираем содержимое кэша на отдельные TLD
-        $this->validTlds = array_filter(
-            explode("\n", trim($content)),
-            fn($tld) => !empty(trim($tld)) // Убираем пустые строки
-        );
-
-        // Проверяем, что загрузили хотя бы несколько TLD
-        return !empty($this->validTlds);
     }
 
     /**
      * Загружает актуальный список TLD с официального сайта IANA
      *
-     * Выполняет HTTP запрос к IANA, парсит полученные данные и фильтрует
-     * комментарии и пустые строки.
+     * Выполняет HTTP запрос к официальному API IANA для получения
+     * актуального списка доменов верхнего уровня.
      *
-     * @return bool true если данные успешно загружены с IANA, false - при ошибке
+     * @return bool true если список успешно загружен
      */
     private function loadFromIana(): bool
     {
-        // Настраиваем контекст для HTTP запроса с таймаутом и User-Agent
         $context = stream_context_create([
             'http' => [
                 'timeout' => self::HTTP_TIMEOUT,
@@ -276,77 +274,91 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
             ]
         ]);
 
-        // Выполняем HTTP запрос к IANA с подавлением ошибок
         $content = @file_get_contents(self::IANA_TLD_URL, false, $context);
 
-        // Проверяем успешность запроса
         if ($content === false) {
-            return false; // Ошибка загрузки (сеть, таймаут, 404 и т.д.)
-        }
-
-        // Разбиваем содержимое на строки
-        $lines = explode("\n", trim($content));
-        $tlds = [];
-
-        // Обрабатываем каждую строку
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            // Пропускаем комментарии (строки начинающиеся с #) и пустые строки
-            if (empty($line) || $line[0] === '#') {
-                continue;
-            }
-
-            // Добавляем TLD в верхнем регистре
-            $tlds[] = strtoupper($line);
-        }
-
-        // Проверяем, что получили разумное количество TLD
-        if (count($tlds) < 100) {
-            // Слишком мало TLD - возможно, сервер IANA вернул ошибку или неполные данные
             return false;
         }
 
-        // Сохраняем загруженные TLD
-        $this->validTlds = $tlds;
+        $lines = explode("\n", trim($content));
+
+        // Фильтруем и обрабатываем строки списка TLD
+        $tlds = array_map(
+            fn(string $line): string => strtoupper($line),
+            array_filter(
+                array_map(fn(string $line): string => trim($line), $lines),
+                fn(string $line): bool => !empty($line) && !str_starts_with($line, '#')
+            )
+        );
+
+        // Проверяем минимальное количество TLD (должно быть разумное количество)
+        $tldCount = count($tlds);
+        if ($tldCount < 100) {
+            error_log("IANA TLD list seems incomplete: only $tldCount TLDs found");
+            return false;
+        }
+
+        $this->validTlds = array_values($tlds); // Переиндексируем массив
+        error_log("TLD list loaded from IANA: $tldCount TLDs");
         return true;
     }
 
     /**
-     * Сохраняет текущий список TLD в файл кэша
+     * Сохраняет текущий список TLD в Redis кэш
      *
-     * Создает необходимые директории и записывает список TLD в файл
-     * для быстрого доступа при следующих запусках.
-     *
-     * @return void
+     * Сохраняет загруженный список TLD и метаданные о кэше в Redis
+     * для использования в последующих запросах.
      */
-    private function saveToCache(): void
+    private function saveToRedisCache(): void
     {
-        // Получаем директорию для кэша
-        $cacheDir = dirname(self::TLD_CACHE_FILE);
-
-        // Создаем директорию если она не существует
-        if (!is_dir($cacheDir)) {
-            @mkdir($cacheDir, 0755, true);
+        if (!$this->cache || empty($this->validTlds)) {
+            return;
         }
 
-        // Сохраняем TLD в файл (каждый TLD на отдельной строке)
-        $content = implode("\n", $this->validTlds);
-        @file_put_contents(self::TLD_CACHE_FILE, $content);
+        try {
+            // Сохраняем список TLD
+            $success = $this->cache->set(
+                self::REDIS_TLD_CACHE_KEY,
+                $this->validTlds,
+                self::CACHE_DURATION
+            );
+
+            if ($success) {
+                $tldCount = count($this->validTlds);
+
+                // Сохраняем метаданные о кэше
+                $metadata = [
+                    'loaded_at' => time(),
+                    'version' => '3.0',
+                    'source' => 'IANA',
+                    'count' => $tldCount,
+                    'url' => self::IANA_TLD_URL
+                ];
+
+                $this->cache->set(
+                    self::REDIS_TLD_METADATA_KEY,
+                    $metadata,
+                    self::CACHE_DURATION
+                );
+
+                error_log("TLD cache saved to Redis: $tldCount TLDs");
+            }
+
+        } catch (Exception $e) {
+            error_log("Error saving TLD cache to Redis: " . $e->getMessage());
+        }
     }
 
     /**
      * Загружает резервный список TLD
      *
-     * Используется как fallback когда IANA недоступна и кэш отсутствует.
-     * Содержит наиболее популярные и стабильные TLD.
-     *
-     * @return void
+     * Используется как fallback когда Redis и IANA недоступны.
+     * Содержит основные общие и страновые домены верхнего уровня.
      */
     private function loadFallbackTlds(): void
     {
-        // Резервный список популярных и стабильных TLD
-        // Этот список используется только в крайнем случае
+        error_log("Using fallback TLD list - Redis and IANA unavailable");
+
         $this->validTlds = [
             // Общие TLD (gTLD)
             'COM', 'NET', 'ORG', 'EDU', 'GOV', 'MIL', 'INT', 'INFO', 'BIZ', 'NAME',
@@ -378,4 +390,95 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
         ];
     }
 
+    /**
+     * Принудительное обновление кэша TLD (для административных целей)
+     *
+     * @return bool true если обновление прошло успешно
+     */
+    public function forceRefreshCache(): bool
+    {
+        if ($this->loadFromIana()) {
+            $this->saveToRedisCache();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Очистка кэша TLD
+     *
+     * Удаляет все данные TLD кэша из Redis, включая список TLD и метаданные.
+     * Используется для принудительной очистки кэша в административных целях.
+     *
+     * @return bool true если кэш успешно очищен
+     */
+    public function clearCache(): bool
+    {
+        if (!$this->cache) {
+            return false;
+        }
+
+        try {
+            // Удаляем ключ со списком TLD
+            $tldDeleted = $this->cache->delete(self::REDIS_TLD_CACHE_KEY);
+
+            // Удаляем ключ с метаданными
+            $metadataDeleted = $this->cache->delete(self::REDIS_TLD_METADATA_KEY);
+
+            // Логируем операцию
+            if ($tldDeleted || $metadataDeleted) {
+                error_log("TLD cache cleared from Redis");
+                return true;
+            }
+
+            return false;
+
+        } catch (Exception $e) {
+            error_log("Error clearing TLD cache from Redis: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Получение информации о состоянии кэша
+     *
+     * Возвращает детальную информацию о состоянии Redis кэша,
+     * включая TTL, метаданные и количество загруженных TLD.
+     *
+     * @return array Информация о кэше
+     */
+    public function getCacheInfo(): array
+    {
+        if (!$this->cache) {
+            return [
+                'status' => 'redis_unavailable',
+                'ttl_seconds' => -2,
+                'ttl_human' => 'redis_unavailable',
+                'metadata' => null,
+                'current_tlds_count' => count($this->validTlds)
+            ];
+        }
+
+        $metadata = $this->cache->get(self::REDIS_TLD_METADATA_KEY);
+        $ttl = $this->cache->getTtl(self::REDIS_TLD_CACHE_KEY);
+        $cacheExists = $this->cache->exists(self::REDIS_TLD_CACHE_KEY);
+
+        $status = match ($cacheExists) {
+            true => 'cached',
+            false => 'not_cached'
+        };
+
+        $ttlHuman = match (true) {
+            $ttl > 0 => gmdate('H:i:s', $ttl),
+            default => 'expired'
+        };
+
+        return [
+            'status' => $status,
+            'ttl_seconds' => $ttl,
+            'ttl_human' => $ttlHuman,
+            'metadata' => $metadata ?: null,
+            'current_tlds_count' => count($this->validTlds)
+        ];
+    }
 }
