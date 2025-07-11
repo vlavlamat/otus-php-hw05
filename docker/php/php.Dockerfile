@@ -25,12 +25,12 @@ RUN rm -f \
         /usr/local/etc/php-fpm.d/zz-docker.conf
 
 # Копируем настройки PHP
-COPY ./php/php.ini /usr/local/etc/php/conf.d/local.ini
+COPY ./php/php.ini.prod /usr/local/etc/php/conf.d/local.ini
 COPY ./php/php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY ./php/conf.d/ /usr/local/etc/php/conf.d/
 COPY ./php/www.conf /usr/local/etc/php-fpm.d/www.conf
 
-# php.ini - основной файл настройки PHP
+# php.ini.dev - основной файл настройки PHP
 # php-fpm.conf - основной конфигурационный файл для PHP-FPM
 # conf.d/ - директория с дополнительными конфигурационными файлами PHP
 # www.conf - конфигурация пула процессов PHP-FPM
