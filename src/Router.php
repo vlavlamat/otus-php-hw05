@@ -103,7 +103,7 @@ class Router
         // Перебираем все зарегистрированные маршруты
         foreach ($this->routes as $route) {
             // Проверяем совпадение метода и пути
-            if ($route['method'] === $method && $this->matchPath($route['path'], $uri)) {
+            if ($route['method'] === $method && $route['path'] === $uri) {
                 // Вызываем обработчик маршрута
                 try {
                     $route['handler']();
@@ -120,30 +120,8 @@ class Router
         echo json_encode(['error' => 'Not Found']);
     }
 
-    /**
-     * Проверяет соответствие пути URI шаблону маршрута
-     *
-     * В текущей реализации выполняется простое сравнение строк.
-     * Этот метод можно расширить для поддержки параметров в URL,
-     * регулярных выражений или других способов сопоставления путей.
-     *
-     * @param string $pattern - Шаблон пути из зарегистрированного маршрута
-     * @param string $uri - Фактический путь URI из запроса
-     * @return bool - true, если путь соответствует шаблону, иначе false
-     */
-    private function matchPath(string $pattern, string $uri): bool
+    private function isValidPath(string $path): bool
     {
-        // Простое сравнение путей (можно расширить для параметров)
-        return $pattern === $uri;
-    }
-
-    private function isValidPath(?string $path): bool
-    {
-        // Проверяем тип - строка или нет
-        if (!is_string($path)) {
-            return false;
-        }
-
         // Проверяем длину - RFC рекомендует ограничение
         if ($path === '' || strlen($path) > 2048) {
             return false;
