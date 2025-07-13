@@ -6,7 +6,7 @@ namespace App\Validators;
 
 use App\Interfaces\PartsValidatorInterface;
 use App\Interfaces\ValidatorInterface;
-use App\ValidationResult;
+use App\Models\ValidationResult;
 
 /**
  * Валидатор синтаксиса email адресов согласно RFC 5322

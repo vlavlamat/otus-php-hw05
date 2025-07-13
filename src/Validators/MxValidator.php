@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Validators;
 
-use App\Interfaces\ValidatorInterface;
 use App\Interfaces\DomainValidatorInterface;
-use App\ValidationResult;
+use App\Interfaces\ValidatorInterface;
+use App\Models\ValidationResult;
 use Throwable;
 
 /**

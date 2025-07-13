@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App;
+namespace App\Services;
+
+use App\Models\ValidationResult;
+use App\Validators\EmailValidator;
 
 /**
  * Сервисный слой для валидации email адресов

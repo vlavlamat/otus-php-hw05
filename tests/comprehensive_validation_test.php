@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use App\EmailValidator;
+use App\Validators\EmailValidator;
 
 echo "=== Comprehensive Email Validation Test ===\n";
 echo "Testing enhanced EmailValidator with:\n";
