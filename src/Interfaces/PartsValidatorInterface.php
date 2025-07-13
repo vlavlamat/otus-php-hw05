@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Interfaces;
 
-use App\ValidationResult;
+use App\Models\ValidationResult;
 
 /**
  * Интерфейс для валидаторов частей email

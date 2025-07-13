@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App;
+namespace App\Controllers;
 
+use App\Services\EmailVerificationService;
 use JsonException;
 use Throwable;
 
@@ -139,10 +140,6 @@ class EmailController
         }
     }
 
-
-
-
-
     /**
      * Получает и парсит данные из тела HTTP запроса
      *
@@ -188,7 +185,7 @@ class EmailController
         // Настраиваем CORS для работы с фронтенд приложениями
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Access-Control-Allow-Headers: Content-Type');
     }
 
     /**

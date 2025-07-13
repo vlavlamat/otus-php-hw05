@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Cache;
+namespace App\Redis\Adapters;
 
+use Exception;
 use RedisCluster;
 use RedisClusterException;
-use Exception;
 
 /**
  * Адаптер для работы с Redis Cluster кэшем

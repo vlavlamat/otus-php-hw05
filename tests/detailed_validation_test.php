@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\EmailExtractor;
-use App\EmailValidator;
+use App\Validators\EmailValidator;
 
 // Test emails that were previously valid but now failing
 $testEmails = [

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use App\Redis\Adapters\RedisCacheAdapter;
 use App\Validators\TldValidator;
-use App\Cache\RedisCacheAdapter;
 
 /**
  * Тестовый скрипт для проверки работы TLD кэша в Redis Cluster

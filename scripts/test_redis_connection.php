@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use App\Cache\RedisCacheAdapter;
+use App\Redis\Adapters\RedisCacheAdapter;
 
 echo "=== Тестирование подключения к Redis Cluster ===\n";
 echo "Время: " . date('Y-m-d H:i:s') . "\n\n";

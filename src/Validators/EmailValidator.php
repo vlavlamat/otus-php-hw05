@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App;
+namespace App\Validators;
 
-use App\Validators\MxValidator;
-use App\Validators\SyntaxValidator;
-use App\Validators\TldValidator;
+use App\Models\ValidationResult;
 
 /**
  * Композитный валидатор email адресов с многоуровневой проверкой
