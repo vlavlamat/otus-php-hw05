@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Services\EmailParser;
 use App\Services\EmailVerificationService;
+use App\Validators\InputValidator;
+use InvalidArgumentException;
 use JsonException;
 use Throwable;
 
@@ -16,10 +19,10 @@ use Throwable;
  * HTTP слоем и бизнес-логикой валидации.
  *
  * Основные возможности:
- * - Валидация массивов email адресов с детальными результатами
- * - Валидация одиночных email адресов
- * - Получение статистики по результатам валидации
- * - Настраиваемые конфигурации валидаторов
+ * - Валидация текста с email адресами с автоматическим парсингом
+ * - Поддержка различных форматов разделителей (новые строки, запятые, пробелы)
+ * - Валидация входных данных на соответствие ограничениям
+ * - Получение детальных результатов валидации для каждого email
  * - Проверка работоспособности сервиса (health check)
  * - Поддержка CORS для кроссдоменных запросов
  * - Обработка ошибок с детальными сообщениями
@@ -29,51 +32,61 @@ use Throwable;
  * - Все методы возвращают JSON ответы
  * - Централизованная обработка ошибок
  * - Валидация входных данных с подробными сообщениями об ошибках
- * - Лимитирование количества email для предотвращения злоупотреблений
+ * - Лимитирование размера текста и количества email для предотвращения злоупотреблений
  *
- * @package App
+ * @package App\Controllers
  * @author Vladimir Matkovskii and Claude 4 Sonnet
  * @version 1.0
  */
 class EmailController
 {
     /**
-     * Максимальное количество email адресов для валидации за один запрос
-     * Предотвращает перегрузку сервера при массовых запросах
-     */
-    private const MAX_EMAILS_PER_REQUEST = 1000;
-
-
-    /**
      * Сервис для выполнения валидации email адресов
      * Инкапсулирует всю бизнес-логику валидации
-     *
-     * @var EmailVerificationService
      */
     private EmailVerificationService $verificationService;
 
     /**
+     * Парсер для извлечения email адресов из текста
+     * Обрабатывает различные форматы разделителей
+     */
+    private EmailParser $emailParser;
+
+    /**
+     * Валидатор входных данных
+     * Проверяет соответствие данных ограничениям системы
+     */
+    private InputValidator $inputValidator;
+
+    /**
      * Конструктор контроллера
      *
-     * Инициализирует контроллер с необходимым сервисом валидации.
+     * Инициализирует контроллер с необходимыми сервисами для валидации.
      * Использует dependency injection для лучшей тестируемости и гибкости.
      *
      * @param EmailVerificationService $verificationService Сервис для валидации email адресов
+     * @param EmailParser $emailParser Парсер для извлечения email из текста
+     * @param InputValidator $inputValidator Валидатор входных данных
      */
-    public function __construct(EmailVerificationService $verificationService)
-    {
+    public function __construct(
+        EmailVerificationService $verificationService,
+        EmailParser $emailParser,
+        InputValidator $inputValidator
+    ) {
         $this->verificationService = $verificationService;
+        $this->emailParser = $emailParser;
+        $this->inputValidator = $inputValidator;
     }
 
     /**
-     * Основной эндпоинт для валидации массива email адресов
+     * Основной эндпоинт для валидации email адресов из текста
      *
-     * Принимает POST запрос с JSON, содержащим массив email адресов,
-     * и возвращает результаты валидации для каждого адреса.
+     * Принимает POST запрос с JSON, содержащим текст с email адресами,
+     * парсит их и возвращает результаты валидации для каждого адреса.
      *
      * Формат входных данных:
      * {
-     *   "emails": ["user@example.com", "test@domain.org", ...]
+     *   "text": "user@example.com, test@domain.org\nuser2@test.com user3@site.ru"
      * }
      *
      * Формат ответа:
@@ -88,7 +101,9 @@ class EmailController
      *     },
      *     ...
      *   ],
-     *   "total": 2
+     *   "total": 4,
+     *   "parsed_count": 4,
+     *   "original_text": "user@example.com, test@domain.org..."
      * }
      *
      * @return void Отправляет JSON ответ напрямую через HTTP
@@ -102,38 +117,41 @@ class EmailController
             // Получаем и парсим данные из тела запроса
             $requestData = $this->getRequestData();
 
-            // Валидируем структуру запроса - проверяем наличие поля 'emails'
-            if (!isset($requestData['emails']) || !is_array($requestData['emails'])) {
-                $this->sendErrorResponse('Поле "emails" обязательно и должно быть массивом');
+            // Валидируем структуру запроса - проверяем наличие поля 'text'
+            if (!isset($requestData['text']) || !is_string($requestData['text'])) {
+                $this->sendErrorResponse('Поле "text" обязательно и должно быть строкой');
                 return;
             }
 
-            $emails = $requestData['emails'];
+            $inputText = $requestData['text'];
 
-            // Проверяем, что массив email адресов не пустой
-            if (empty($emails)) {
-                $this->sendErrorResponse('Массив email адресов не может быть пустым');
-                return;
-            }
+            // Валидируем длину входного текста
+            $this->inputValidator->validateTextLength($inputText);
 
-            // Ограничиваем количество email для предотвращения злоупотреблений
-            if (count($emails) > self::MAX_EMAILS_PER_REQUEST) {
-                $this->sendErrorResponse(
-                    'Максимальное количество email адресов для проверки: ' . self::MAX_EMAILS_PER_REQUEST
-                );
-                return;
-            }
+            // Парсим email адреса из входного текста
+            $emails = $this->emailParser->parse($inputText);
+
+            // Валидируем количество найденных email адресов
+            $this->inputValidator->validateArraySize($emails, 'email адресов');
 
             // Выполняем валидацию через сервис
             $results = $this->verificationService->verifyForApi($emails);
 
-            // Отправляем успешный ответ с результатами
+            // Отправляем успешный ответ с результатами и дополнительной информацией
             $this->sendSuccessResponse([
                 'success' => true,
                 'results' => $results,
                 'total' => count($results),
+                'parsed_count' => count($emails),
+                'original_text' => $this->truncateText($inputText)
             ]);
 
+        } catch (InvalidArgumentException $e) {
+            // Обрабатываем ошибки валидации входных данных
+            $this->sendErrorResponse($e->getMessage());
+        } catch (JsonException $e) {
+            // Обрабатываем ошибки парсинга JSON
+            $this->sendErrorResponse('Некорректный JSON в запросе: ' . $e->getMessage());
         } catch (Throwable $e) {
             // Обрабатываем любые непредвиденные ошибки
             $this->sendErrorResponse('Внутренняя ошибка сервера: ' . $e->getMessage(), 500);
@@ -148,7 +166,7 @@ class EmailController
      * для пустых запросов.
      *
      * @return array Декодированные данные из JSON или пустой массив
-     * @throws JsonException При некорректном JSON (автоматически обрабатывается в вызывающих методах)
+     * @throws JsonException При некорректном JSON
      */
     private function getRequestData(): array
     {
@@ -230,16 +248,39 @@ class EmailController
     }
 
     /**
-     * Фабричный метод для создания контроллера с сервисом по умолчанию
+     * Обрезает текст до фиксированной длины для включения в ответ
+     *
+     * Полезно для включения фрагмента исходного текста в ответ API
+     * без передачи всего содержимого.
+     *
+     * @param string $text Исходный текст
+     * @return string Обрезанный текст с многоточием при необходимости
+     */
+    private function truncateText(string $text): string
+    {
+        $maxLength = 100;
+        
+        if (strlen($text) <= $maxLength) {
+            return $text;
+        }
+
+        return substr($text, 0, $maxLength - 3) . '...';
+    }
+
+    /**
+     * Фабричный метод для создания контроллера с сервисами по умолчанию
      *
      * Упрощает создание экземпляра контроллера с готовой конфигурацией.
-     * Использует стандартный сервис валидации со всеми включенными валидаторами.
+     * Использует стандартные сервисы с настройками по умолчанию.
      *
      * @return EmailController Готовый к использованию экземпляр контроллера
      */
     public static function createDefault(): EmailController
     {
-        return new self(EmailVerificationService::createDefault());
+        return new self(
+            EmailVerificationService::createDefault(),
+            new EmailParser(),
+            new InputValidator()
+        );
     }
-
 }

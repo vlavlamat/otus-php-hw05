@@ -25,7 +25,7 @@ class RedisCacheAdapter
      */
     public function __construct(?array $config = null)
     {
-        $config = $config ?? require __DIR__ . '/../../config/redis.php';
+        $config = $config ?? require __DIR__ . '/../../../config/redis.php';
 
         $this->cluster = new RedisCluster(
             null,
