@@ -2,7 +2,8 @@
 # а просто именованными действиями, которые всегда должны выполняться.
 .PHONY: up down build dev-up dev-down dev-build \
         prod-up prod-down prod-build-multiarch \
-        logs dev-logs prod-logs ps
+        logs dev-logs prod-logs ps \
+        test-setup test test-coverage
 
 # ────────────────────────────────
 # Переменные

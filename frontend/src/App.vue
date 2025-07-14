@@ -18,15 +18,15 @@
       </div>
       <textarea
           v-model="textInput"
-          :maxlength="20000"
+          :maxlength="1000"
           :readonly="isReadOnly"
-          placeholder="Вставьте текст с email адресами (до 20,000 символов)"
+          placeholder="Вставьте текст с email адресами (до 1,000 символов)"
           class="text-input-field"
       >
       </textarea>
       <!-- Динамический счетчик символов с предупреждением -->
-      <div class="characters-count" :class="{ 'warn': textInput.length > 14000 }">
-        {{ textInput.length }}/20000 символов
+      <div class="characters-count" :class="{ 'warn': textInput.length > 700 }">
+        {{ textInput.length }}/1000 символов
       </div>
     </div>
 
@@ -245,7 +245,7 @@ const handleApiError = (error) => {
     if (errorMessage.includes('Empty input')) {
       return 'Пустой текст! Status: 400 Bad Request.'
     } else if (errorMessage.includes('Input too large')) {
-      return 'Превышен лимит в 20,000 символов! Status: 400 Bad Request.'
+      return 'Превышен лимит в 1,000 символов! Status: 400 Bad Request.'
     } else {
       return 'Некорректные данные! Status: 400 Bad Request.'
     }
@@ -315,8 +315,8 @@ const validateEmail = async () => {
    */
 
   // Проверка лимита символов
-  if (textInput.value.length > 20000) {
-    result.value = 'Превышен лимит в 20,000 символов!'
+  if (textInput.value.length > 1000) {
+    result.value = 'Превышен лимит в 1,000 символов!'
     return
   }
 

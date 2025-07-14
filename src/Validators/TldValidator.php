@@ -85,7 +85,10 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
         // Автоматически создаем Redis адаптер если не передан (согласно алгоритму)
         if ($cache === null) {
             try {
-                $this->cache = new RedisCacheAdapter();
+                // Загружаем конфигурацию для получения префикса
+                $config = require __DIR__ . '/../../config/redis.php';
+                $prefix = $config['tld_cache']['prefix'] ?? 'tld_cache:';
+                $this->cache = new RedisCacheAdapter($prefix, $config);
             } catch (Exception $e) {
                 // Если Redis недоступен, продолжаем без кэша
                 error_log("Redis cache unavailable during TldValidator initialization: " . $e->getMessage());

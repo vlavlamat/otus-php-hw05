@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         cacheResultFile=".phpunit.result.cache"
+         executionOrder="depends,defects"
+         forceCoversAnnotation="false"
+         beStrictAboutCoversAnnotation="true"
+         beStrictAboutOutputDuringTests="true"
+         beStrictAboutTodoAnnotatedTests="true"
+         failOnRisky="true"
+         failOnWarning="true"
+         verbose="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory suffix="Test.php">./tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory suffix="Test.php">./tests/Integration</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory suffix="Test.php">./tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage cacheDirectory=".phpunit.cache/code-coverage"
+              processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">./src</directory>
+        </include>
+        <exclude>
+            <directory>./src/Interfaces</directory>
+        </exclude>
+        <report>
+            <html outputDirectory="coverage/html"/>
+            <text outputFile="coverage/coverage.txt"/>
+            <clover outputFile="coverage/clover.xml"/>
+        </report>
+    </coverage>
+
+    <php>
+        <env name="APP_ENV" value="testing"/>
+
+        <!-- Mock Redis Cluster настройки для тестирования -->
+        <!-- Используем localhost узлы для mock Redis вместо реального кластера -->
+        <env name="REDIS_CLUSTER_NODES" value="127.0.0.1:6379"/>
+        <env name="REDIS_QUORUM" value="1"/>
+        <env name="REDIS_TIMEOUT" value="1"/>
+        <env name="REDIS_READ_TIMEOUT" value="1"/>
+
+        <!-- Настройки кэширования для тестов -->
+        <env name="REDIS_TLD_CACHE_TTL" value="60"/>
+        <env name="REDIS_TLD_CACHE_PREFIX" value="test_tld_cache:"/>
+        <env name="REDIS_MX_CACHE_TTL" value="60"/>
+        <env name="REDIS_MX_CACHE_PREFIX" value="test_mx_cache:"/>
+
+        <!-- Настройки сессий для тестов -->
+        <env name="REDIS_SESSION_PREFIX" value="test_session:"/>
+        <env name="REDIS_SESSION_LIFETIME" value="3600"/>
+
+        <!-- Настройки мониторинга для тестов -->
+        <env name="REDIS_CHECK_INTERVAL" value="5"/>
+        <env name="REDIS_PING_TIMEOUT" value="1"/>
+    </php>
+
+    <logging>
+        <junit outputFile="coverage/junit.xml"/>
+    </logging>
+</phpunit>

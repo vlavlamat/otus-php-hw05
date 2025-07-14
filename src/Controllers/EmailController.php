@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Services\EmailParser;
 use App\Services\EmailVerificationService;
 use App\Validators\InputValidator;
 use InvalidArgumentException;
@@ -47,12 +46,6 @@ class EmailController
     private EmailVerificationService $verificationService;
 
     /**
-     * Парсер для извлечения email адресов из текста
-     * Обрабатывает различные форматы разделителей
-     */
-    private EmailParser $emailParser;
-
-    /**
      * Валидатор входных данных
      * Проверяет соответствие данных ограничениям системы
      */
@@ -65,16 +58,13 @@ class EmailController
      * Использует dependency injection для лучшей тестируемости и гибкости.
      *
      * @param EmailVerificationService $verificationService Сервис для валидации email адресов
-     * @param EmailParser $emailParser Парсер для извлечения email из текста
      * @param InputValidator $inputValidator Валидатор входных данных
      */
     public function __construct(
         EmailVerificationService $verificationService,
-        EmailParser $emailParser,
         InputValidator $inputValidator
     ) {
         $this->verificationService = $verificationService;
-        $this->emailParser = $emailParser;
         $this->inputValidator = $inputValidator;
     }
 
@@ -129,7 +119,7 @@ class EmailController
             $this->inputValidator->validateTextLength($inputText);
 
             // Парсим email адреса из входного текста
-            $emails = $this->emailParser->parse($inputText);
+            $emails = $this->parseEmails($inputText);
 
             // Валидируем количество найденных email адресов
             $this->inputValidator->validateArraySize($emails, 'email адресов');
@@ -259,12 +249,75 @@ class EmailController
     private function truncateText(string $text): string
     {
         $maxLength = 100;
-        
+
         if (strlen($text) <= $maxLength) {
             return $text;
         }
 
         return substr($text, 0, $maxLength - 3) . '...';
+    }
+
+    /**
+     * Парсит текст с email адресами в массив
+     *
+     * Разбивает входной текст по всем поддерживаемым разделителям,
+     * нормализует данные и возвращает очищенный массив уникальных email адресов.
+     *
+     * Поддерживаемые разделители:
+     * - Переносы строк (\n, \r\n)
+     * - Запятая с пробелом (", ")
+     * - Точка с запятой с пробелом ("; ")
+     * - Запятая перед переносом строки (",\n", ";\n")
+     * - Одиночная запятая (",")
+     * - Точка с запятой (";")
+     * - Пробелы (" ")
+     *
+     * @param string $text Входной текст с email адресами
+     * @return array Массив уникальных email адресов
+     */
+    private function parseEmails(string $text): array
+    {
+        // Разделители для парсинга email адресов в порядке приоритета
+        $separators = [
+            "\r\n",  // Windows переносы строк (должен быть перед \n)
+            "\n",    // Unix/Linux переносы строк
+            ",\n",   // Запятая перед переносом строки
+            ";\n",   // Точка с запятой перед переносом строки
+            ", ",    // Запятая с пробелом (стандартный CSV формат)
+            "; ",    // Точка с запятой с пробелом
+            ",",     // Одиночная запятая
+            ";",     // Точка с запятой
+            " ",     // Пробелы (обрабатывается последним)
+        ];
+
+        // Начинаем с исходного текста как единого элемента
+        $items = [$text];
+
+        // Последовательно разбиваем по каждому разделителю
+        foreach ($separators as $separator) {
+            $newItems = [];
+            foreach ($items as $item) {
+                if (is_string($item) && str_contains($item, $separator)) {
+                    $splitItems = explode($separator, $item);
+                    $newItems = array_merge($newItems, $splitItems);
+                } else {
+                    $newItems[] = $item;
+                }
+            }
+            $items = $newItems;
+        }
+
+        // Нормализуем данные: trim + фильтрация пустых + удаление дубликатов
+        $cleaned = [];
+        foreach ($items as $item) {
+            $cleanItem = trim((string)$item);
+            $cleanItem = trim($cleanItem, ",; \n\r");
+            if ($cleanItem !== '') {
+                $cleaned[] = $cleanItem;
+            }
+        }
+
+        return array_values(array_unique($cleaned));
     }
 
     /**
@@ -279,7 +332,6 @@ class EmailController
     {
         return new self(
             EmailVerificationService::createDefault(),
-            new EmailParser(),
             new InputValidator()
         );
     }
