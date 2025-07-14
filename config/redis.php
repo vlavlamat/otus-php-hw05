@@ -52,5 +52,10 @@ return [
     'tld_cache' => [
         'ttl' => (int)($_ENV['REDIS_TLD_CACHE_TTL'] ?? 86400),
         'prefix' => $_ENV['REDIS_TLD_CACHE_PREFIX'] ?? 'tld_cache:'
+    ],
+    // Настройки для MX кэширования
+    'mx_cache' => [
+        'ttl' => (int)($_ENV['REDIS_MX_CACHE_TTL'] ?? 3600), // 1 час
+        'prefix' => $_ENV['REDIS_MX_CACHE_PREFIX'] ?? 'mx_cache:'
     ]
 ];

@@ -17,6 +17,32 @@ declare(strict_types=1);
 // Автозагрузчик необходим для автоматического подключения всех классов приложения
 require __DIR__ . '/../vendor/autoload.php';
 
+/**
+ * Загрузка переменных окружения из .env.dev файла
+ *
+ * Определяем окружение и загружаем соответствующий файл конфигурации:
+ * - Для продакшена (APP_ENV=production): загружается .env.dev.prod
+ * - Для разработки (по умолчанию): загружается .env.dev
+ * Переменные устанавливаются как в putenv(), так и в $_ENV для максимальной совместимости.
+ */
+// Определяем окружение из серверных переменных или по умолчанию development
+$environment = $_SERVER['APP_ENV'] ?? getenv('APP_ENV') ?: 'development';
+
+// Выбираем файл конфигурации в зависимости от окружения
+$envFile = ($environment === 'production') ? '.env.dev.prod' : '.env.dev';
+$envPath = __DIR__ . '/../env/' . $envFile;
+
+if (file_exists($envPath)) {
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (str_contains($line, '=') && $line[0] !== '#') {
+            putenv($line);
+            [$key, $value] = explode('=', $line, 2);
+            $_ENV[$key] = $value;
+        }
+    }
+}
+
 use App\Controllers\EmailController;
 use App\Controllers\RedisHealthController;
 use App\Core\Router;

@@ -7,7 +7,9 @@ namespace App\Validators;
 use App\Interfaces\DomainValidatorInterface;
 use App\Interfaces\ValidatorInterface;
 use App\Models\ValidationResult;
+use App\Redis\Adapters\RedisCacheAdapter;
 use Throwable;
+use Exception;
 
 /**
  * Валидатор MX записей (Mail eXchanger) для email адресов
@@ -21,10 +23,11 @@ use Throwable;
  * - Настраиваемые таймауты для DNS запросов
  * - Детальная обработка различных типов DNS ошибок
  * - Поддерживает как новое API (validateDomain), так и старое (validate)
+ * - Кэширование результатов в Redis Cluster
  *
  * @package App\Validators
  * @author Vladimir Matkovskii and Claude 4 Sonnet
- * @version 1.0
+ * @version 1.1
  */
 class MxValidator implements ValidatorInterface, DomainValidatorInterface
 {
@@ -46,6 +49,37 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
      */
     private const MAX_MX_PRIORITY = 65535;
 
+    /**
+     * Время жизни кэша для MX-записей в секундах (2 часа)
+     * Увеличено до 2 часов, так как MX записи редко меняются
+     */
+    private const CACHE_TTL = 7200;
+
+    /**
+     * Адаптер для кэширования в Redis
+     */
+    private ?RedisCacheAdapter $cache;
+
+    /**
+     * Конструктор класса
+     *
+     * @param RedisCacheAdapter|null $cache Адаптер Redis кэша (для DI и тестирования)
+     */
+    public function __construct(?RedisCacheAdapter $cache = null)
+    {
+        if ($cache === null) {
+            try {
+                $config = require __DIR__ . '/../../config/redis.php';
+                $prefix = $config['mx_cache']['prefix'] ?? 'mx_cache:';
+                $this->cache = new RedisCacheAdapter($prefix, $config);
+            } catch (Exception $e) {
+                error_log("Redis cache unavailable during MxValidator initialization: " . $e->getMessage());
+                $this->cache = null;
+            }
+        } else {
+            $this->cache = $cache;
+        }
+    }
 
     /**
      * Валидирует доменную часть на наличие MX записей
@@ -67,23 +101,23 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
         // Нормализуем домен (убираем пробелы, приводим к нижнему регистру)
         $domain = strtolower(trim($domain));
 
-        // Проверяем базовый формат домена
-        if (!$this->isValidDomainFormat($domain)) {
-            return ValidationResult::invalidMx(
-                $fullEmail,
-                'Неверный формат доменной части. Домен должен содержать только допустимые символы'
-            );
+        // 1. Проверка кэша
+        if ($this->cache) {
+            $cachedResult = $this->getCachedResult($domain, $fullEmail);
+            if ($cachedResult !== null) {
+                return $cachedResult;
+            }
         }
 
-        // Основная проверка MX записей
-        $mxCheckResult = $this->checkMxRecords($domain);
+        // 2. Если в кэше нет - выполняем полную валидацию
+        $result = $this->performFullValidation($domain, $fullEmail);
 
-        if (!$mxCheckResult['valid']) {
-            return ValidationResult::invalidMx($fullEmail, $mxCheckResult['reason']);
+        // 3. Сохраняем результат в кэш
+        if ($this->cache) {
+            $this->cacheResult($domain, $result);
         }
 
-        // Все проверки прошли успешно
-        return ValidationResult::valid($fullEmail);
+        return $result;
     }
 
     /**
@@ -115,6 +149,89 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
     }
 
     /**
+     * Получает результат из кэша
+     *
+     * @param string $domain Нормализованное доменное имя
+     * @param string $fullEmail Полный email для создания ValidationResult
+     * @return ValidationResult|null Результат из кэша или null, если не найден
+     */
+    private function getCachedResult(string $domain, string $fullEmail): ?ValidationResult
+    {
+        try {
+            $cacheData = $this->cache->get($domain);
+
+            if ($cacheData === null) {
+                return null;
+            }
+
+            // Проверяем, что кэш содержит нужные поля
+            if (!array_key_exists('status', $cacheData) || !array_key_exists('reason', $cacheData)) {
+                return null;
+            }
+
+            // Возвращаем результат с актуальным email, но статусом из кэша
+            return new ValidationResult($fullEmail, $cacheData['status'], $cacheData['reason']);
+
+        } catch (Exception $e) {
+            // Логируем ошибку только в продакшн окружении
+            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+                error_log("Redis cache GET error for domain '$domain': " . $e->getMessage());
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Сохраняет результат в кэш
+     *
+     * @param string $domain Нормализованное доменное имя
+     * @param ValidationResult $result Результат валидации для кэширования
+     */
+    private function cacheResult(string $domain, ValidationResult $result): void
+    {
+        try {
+            $cacheData = [
+                'status' => $result->status,
+                'reason' => $result->reason,
+                'cached_at' => time(),
+            ];
+
+            $this->cache->set($domain, $cacheData, self::CACHE_TTL);
+        } catch (Exception $e) {
+            // Логируем ошибку только в продакшн окружении
+            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+                error_log("Redis cache SET error for domain '$domain': " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Выполняет полную валидацию домена
+     *
+     * @param string $domain Нормализованное доменное имя
+     * @param string $fullEmail Полный email адрес
+     * @return ValidationResult Результат валидации
+     */
+    private function performFullValidation(string $domain, string $fullEmail): ValidationResult
+    {
+        // Проверка формата домена
+        if (!$this->isValidDomainFormat($domain)) {
+            return ValidationResult::invalidMx(
+                $fullEmail,
+                'Неверный формат доменной части. Домен должен содержать только допустимые символы'
+            );
+        }
+
+        // Основная проверка MX записей
+        $mxCheckResult = $this->checkMxRecords($domain);
+        if ($mxCheckResult['valid']) {
+            return ValidationResult::valid($fullEmail);
+        } else {
+            return ValidationResult::invalidMx($fullEmail, $mxCheckResult['reason']);
+        }
+    }
+
+    /**
      * Проверяет базовый формат доменного имени
      *
      * Выполняет предварительную проверку формата домена перед DNS запросами.
@@ -135,17 +252,16 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
             return false;
         }
 
-        // Проверяем, что домен не начинается и не заканчивается точкой или дефисом
+        // Проверяем начало и конец строки
         if (preg_match('/^[.-]|[.-]$/', $domain)) {
             return false;
         }
 
-        // Проверяем на наличие двойных точек
-        if (str_contains($domain, '..')) {
+        // Проверяем на последовательные точки и дефисы
+        if (str_contains($domain, '..') || str_contains($domain, '--')) {
             return false;
         }
 
-        // Базовая проверка пройдена
         return true;
     }
 
@@ -194,7 +310,7 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
     {
         // Выполняем попытки с паузами между ними
         for ($attempt = 0; $attempt <= self::MAX_DNS_RETRIES; $attempt++) {
-            // Устанавливаем таймаут для DNS запроса (если поддерживается системой)
+            // Устанавливаем таймаут для DNS запроса
             $originalTimeout = ini_get('default_socket_timeout');
             ini_set('default_socket_timeout', (string)self::DNS_TIMEOUT);
 
@@ -250,22 +366,24 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
      */
     private function checkARecordFallback(string $domain): array
     {
-        // Проверяем наличие A записи для домена
-        $aRecord = @gethostbyname($domain);
+        // Используем более современный метод для проверки A записи
+        try {
+            $aRecords = @dns_get_record($domain, DNS_A);
 
-        // gethostbyname возвращает тот же домен, если A запись не найдена
-        if ($aRecord === $domain) {
-            return [
-                'valid' => false,
-                'reason' => "Домен '$domain' не имеет MX записей и A записи. " .
-                    "Невозможно доставить почту на этот домен"
-            ];
+            if (is_array($aRecords) && !empty($aRecords)) {
+                return [
+                    'valid' => true,
+                    'reason' => "MX записи отсутствуют, но найдена A запись (fallback допустим по RFC)"
+                ];
+            }
+        } catch (Exception $e) {
+            error_log("A record check failed for domain '$domain': " . $e->getMessage());
         }
 
-        // A запись найдена - это допустимо для приема почты
         return [
-            'valid' => true,
-            'reason' => "MX записи отсутствуют, но найдена A запись (fallback допустим по RFC)"
+            'valid' => false,
+            'reason' => "Домен '$domain' не имеет MX записей и A записи. " .
+                "Невозможно доставить почту на этот домен"
         ];
     }
 
@@ -339,13 +457,19 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
         $mxHost = $bestMxRecord['host'];
 
         // Проверяем, что MX хост имеет A запись
-        $mxHostIp = @gethostbyname($mxHost);
+        try {
+            $aRecords = @dns_get_record($mxHost, DNS_A);
 
-        if ($mxHostIp === $mxHost) {
-            // MX хост не резолвится в IP адрес
+            if (!is_array($aRecords) || empty($aRecords)) {
+                return [
+                    'valid' => false,
+                    'reason' => "MX сервер '$mxHost' для домена '$domain' не имеет A записи"
+                ];
+            }
+        } catch (Exception $e) {
             return [
                 'valid' => false,
-                'reason' => "MX сервер '$mxHost' для домена '$domain' не имеет A записи"
+                'reason' => "Не удалось проверить A запись для MX сервера '$mxHost': " . $e->getMessage()
             ];
         }
 
@@ -355,5 +479,4 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
             'reason' => "Найдены валидные MX записи для домена '$domain'"
         ];
     }
-
 }
