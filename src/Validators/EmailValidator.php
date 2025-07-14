@@ -66,9 +66,10 @@ class EmailValidator
      */
     public function __construct(
         SyntaxValidator $syntaxValidator,
-        TldValidator $tldValidator,
-        MxValidator $mxValidator
-    ) {
+        TldValidator    $tldValidator,
+        MxValidator     $mxValidator
+    )
+    {
         $this->syntaxValidator = $syntaxValidator;
         $this->tldValidator = $tldValidator;
         $this->mxValidator = $mxValidator;

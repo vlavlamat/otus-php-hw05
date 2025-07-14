@@ -330,7 +330,7 @@ class MxValidator implements ValidatorInterface, DomainValidatorInterface
     private function verifyBestMxRecord(string $domain, array $mxRecords): array
     {
         // Сортируем MX записи по приоритету (меньший приоритет = выше приоритет)
-        usort($mxRecords, function($a, $b) {
+        usort($mxRecords, function ($a, $b) {
             return $a['priority'] <=> $b['priority'];
         });
 

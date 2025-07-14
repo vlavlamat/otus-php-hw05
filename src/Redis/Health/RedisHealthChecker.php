@@ -43,7 +43,7 @@ class RedisHealthChecker
     public function __construct(?array $config = null)
     {
         // Загружаем конфигурацию Redis (используем переданную или загружаем из файла)
-        $this->config = $config ?? require __DIR__ . '/../config/redis.php';
+        $this->config = $config ?? require __DIR__ . '/../../../config/redis.php';
 
         try {
             // Инициализируем подключение к Redis Cluster используя узлы из конфигурации
