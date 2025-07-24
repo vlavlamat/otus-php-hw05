@@ -31,8 +31,8 @@ class RedisCacheAdapter
         $this->cluster = new RedisCluster(
             null,
             $config['cluster']['nodes'],
-            $config['cluster']['timeout'] ?? 5,
-            $config['cluster']['read_timeout'] ?? 5
+            $config['cluster']['timeout'] ?: 5,
+            $config['cluster']['read_timeout'] ?: 5
         );
 
         // Устанавливаем префикс для ключей кэша
@@ -56,7 +56,7 @@ class RedisCacheAdapter
             return $this->cluster->setex($fullKey, $ttl, $serializedData);
         } catch (Exception $e) {
             // Логируем ошибку и возвращаем false (кроме тестового окружения)
-            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+            if ((getenv('APP_ENV') ?? '') !== 'testing') {
                 error_log("Redis cache SET error for key '$key': " . $e->getMessage());
             }
             return false;
@@ -82,7 +82,7 @@ class RedisCacheAdapter
             return unserialize($serializedData);
         } catch (Exception $e) {
             // Логируем ошибку только в продакшн окружении
-            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+            if ((getenv('APP_ENV') ?? '') !== 'testing') {
                 error_log("Redis cache GET error for key '$key': " . $e->getMessage());
             }
             return null;
@@ -102,7 +102,7 @@ class RedisCacheAdapter
             return $this->cluster->exists($fullKey) > 0;
         } catch (Exception $e) {
             // Логируем ошибку только в продакшн окружении
-            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+            if ((getenv('APP_ENV') ?? '') !== 'testing') {
                 error_log("Redis cache EXISTS error for key '$key': " . $e->getMessage());
             }
             return false;
@@ -122,7 +122,7 @@ class RedisCacheAdapter
             return $this->cluster->ttl($fullKey);
         } catch (Exception $e) {
             // Логируем ошибку только в продакшн окружении
-            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+            if ((getenv('APP_ENV') ?? '') !== 'testing') {
                 error_log("Redis cache TTL error for key '$key': " . $e->getMessage());
             }
             return -2; // Ключ не существует
@@ -144,7 +144,7 @@ class RedisCacheAdapter
             return $this->cluster->del($fullKey) > 0;
         } catch (Exception $e) {
             // Логируем ошибку только в продакшн окружении
-            if (($_ENV['APP_ENV'] ?? '') !== 'testing') {
+            if ((getenv('APP_ENV') ?? '') !== 'testing') {
                 error_log("Redis cache DELETE error for key '$key': " . $e->getMessage());
             }
             return false;

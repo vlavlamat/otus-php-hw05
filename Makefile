@@ -76,6 +76,7 @@ prod-build:
 ps:
 	docker compose ps
 
+
 # ────────────────────────────────
 # Тестирование
 # ────────────────────────────────
@@ -87,6 +88,7 @@ test-setup:
 
 # Запуск тестов в контейнере
 test: test-setup
+	@echo "Запуск тестов..."
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml exec php-fpm1 vendor/bin/phpunit -c phpunit.xml
 
 # Запуск тестов с покрытием кода

@@ -55,7 +55,7 @@ desktop.ini
 
 # Персональные и секретные конфиги
 env/.env.dev
-env/.env.*
+env/.env.prod
 !env/.env.dev.example
 !env/.env.prod.example
 

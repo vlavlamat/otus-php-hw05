@@ -12,22 +12,7 @@ use Throwable;
 use Exception;
 
 /**
- * Валидатор MX записей (Mail eXchanger) для email адресов
- *
- * Проверяет наличие MX записей в DNS для доменной части email адреса.
- * MX записи указывают, какие серверы отвечают за прием почты для данного домена.
- *
- * Особенности работы:
- * - Выполняет DNS запрос для проверки MX записей
- * - Поддерживает fallback на A записи (если нет MX, проверяет A запись)
- * - Настраиваемые таймауты для DNS запросов
- * - Детальная обработка различных типов DNS ошибок
- * - Поддерживает как новое API (validateDomain), так и старое (validate)
- * - Кэширование результатов в Redis Cluster
- *
- * @package App\Validators
- * @author Vladimir Matkovskii and Claude 4 Sonnet
- * @version 1.1
+ * Валидатор MX записей с DNS проверкой и Redis кэшированием
  */
 class MxValidator implements ValidatorInterface, DomainValidatorInterface
 {

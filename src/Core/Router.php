@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use InvalidArgumentException;
 use Throwable;
+use InvalidArgumentException;
 
 /**
  * Класс Router
@@ -46,13 +46,13 @@ class Router
 
         // Валидация пути
         if (!$this->isValidPath($path)) {
-            throw new InvalidArgumentException("Invalid path $path");
+            throw new InvalidArgumentException("Недопустимый путь $path");
         }
 
         // Проверяем дублирование
         foreach ($this->routes as $route) {
             if ($route['method'] === $method && $route['path'] === $path) {
-                throw new InvalidArgumentException("Route $method $path already exists");
+                throw new InvalidArgumentException("Маршрут $method $path уже существует");
             }
         }
         // Создаем ассоциативный массив с данными маршрута и добавляем его в конец массива $this->routes
@@ -89,14 +89,14 @@ class Router
         // Проверяем корректность URI
         if ($uri === false || $uri === null) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid URI']);
+            echo json_encode(['error' => 'Недопустимый URI'], JSON_UNESCAPED_UNICODE);
             return;
         }
 
         // Проверяем корректность пути
         if (!$this->isValidPath($uri)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid URI']);
+            echo json_encode(['error' => 'Недопустимый путь'], JSON_UNESCAPED_UNICODE);
             return;
         }
 
@@ -109,7 +109,7 @@ class Router
                     $route['handler']();
                 } catch (Throwable) {
                     http_response_code(500);
-                    echo json_encode(['error' => 'Internal server error']);
+                    echo json_encode(['error' => 'Внутренняя ошибка сервера'], JSON_UNESCAPED_UNICODE);
                 }
                 return;
             }
@@ -117,7 +117,7 @@ class Router
 
         // Если маршрут не найден, возвращаем ошибку 404
         http_response_code(404);
-        echo json_encode(['error' => 'Not Found']);
+        echo json_encode(['error' => 'Маршрут не найден.302'], JSON_UNESCAPED_UNICODE);
     }
 
     private function isValidPath(string $path): bool

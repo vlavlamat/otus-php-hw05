@@ -50,8 +50,8 @@ class RedisHealthChecker
             $this->cluster = new RedisCluster(
                 null,
                 $this->config['cluster']['nodes'],
-                $this->config['cluster']['timeout'] ?? 5,
-                $this->config['cluster']['read_timeout'] ?? 5
+                $this->config['cluster']['timeout'] ?: 5,
+                $this->config['cluster']['read_timeout'] ?: 5
             );
 
             // Проверяем соединение, выполнив простую команду
@@ -61,7 +61,7 @@ class RedisHealthChecker
             // Если произошла любая ошибка при подключении или проверке соединения,
             // выбрасываем RedisClusterException
             throw new RedisClusterException(
-                'Failed to connect to Redis Cluster: ' . $e->getMessage(),
+                'Не удалось подключиться к Redis Cluster: ' . $e->getMessage(),
                 $e->getCode(),
                 $e
             );
