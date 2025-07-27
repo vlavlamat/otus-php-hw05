@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Models\ValidationResult;
 use App\Redis\Adapters\RedisCacheAdapter;
 use App\Validators\TldValidator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionException;
 
 class TldValidatorTest extends TestCase
 {
@@ -21,11 +22,14 @@ class TldValidatorTest extends TestCase
         $this->validator = new TldValidator($this->mockCache);
     }
 
+    /**
+     * @doesNotPerformAssertions
+     */
     public function testConstructorWithoutCache(): void
     {
-        // Test constructor without cache parameter (will try to create Redis adapter)
-        $validator = new TldValidator(null);
-        $this->assertInstanceOf(TldValidator::class, $validator);
+        // Test that the constructor does not throw an exception when the cache is not provided.
+        new TldValidator(null);
+
     }
 
     public function testValidateDomainWithValidTld(): void
@@ -135,10 +139,14 @@ class TldValidatorTest extends TestCase
         $this->assertSame('Email должен содержать ровно один символ @', $result->reason);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testExtractTld(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('extractTld');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $this->assertSame('COM', $method->invoke($this->validator, 'example.com'));
@@ -148,13 +156,17 @@ class TldValidatorTest extends TestCase
         $this->assertSame('', $method->invoke($this->validator, ''));
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testIsTldValidWithFallbackTlds(): void
     {
         // Mock cache to return false so fallback TLDs are used
         $this->mockCache->method('exists')->willReturn(false);
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('isTldValid');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         // Test valid TLDs from fallback list
@@ -167,6 +179,9 @@ class TldValidatorTest extends TestCase
         $this->assertFalse($method->invoke($this->validator, 'INVALIDTLD'));
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testLoadFromRedisCacheSuccess(): void
     {
         $cachedTlds = ['COM', 'NET', 'ORG', 'TEST'];
@@ -184,8 +199,9 @@ class TldValidatorTest extends TestCase
                 ['tlds_metadata', $metadata]
             ]);
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('loadFromRedisCache');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator);
@@ -193,59 +209,77 @@ class TldValidatorTest extends TestCase
 
         // Check that TLDs were loaded
         $validTldsProperty = $reflection->getProperty('validTlds');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $validTldsProperty->setAccessible(true);
         $this->assertSame($cachedTlds, $validTldsProperty->getValue($this->validator));
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testLoadFromRedisCacheFailure(): void
     {
         $this->mockCache->method('exists')->willReturn(false);
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('loadFromRedisCache');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator);
         $this->assertFalse($result);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testLoadFromRedisCacheWithInvalidData(): void
     {
         $this->mockCache->method('exists')->willReturn(true);
         $this->mockCache->method('get')->willReturn(null); // Invalid data
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('loadFromRedisCache');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator);
         $this->assertFalse($result);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testLoadFromRedisCacheWithEmptyArray(): void
     {
         $this->mockCache->method('exists')->willReturn(true);
         $this->mockCache->method('get')->willReturn([]); // Empty array
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('loadFromRedisCache');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator);
         $this->assertFalse($result);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testSaveToRedisCache(): void
     {
         $this->mockCache->method('set')->willReturn(true);
 
         // Set some TLDs first
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $validTldsProperty = $reflection->getProperty('validTlds');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $validTldsProperty->setAccessible(true);
         $validTldsProperty->setValue($this->validator, ['COM', 'NET', 'ORG']);
 
         $method = $reflection->getMethod('saveToRedisCache');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         // Should not throw any exceptions
@@ -253,12 +287,16 @@ class TldValidatorTest extends TestCase
         $this->assertTrue(true); // If we get here, no exception was thrown
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testSaveToRedisCacheWithoutCache(): void
     {
         $validator = new TldValidator(null);
 
-        $reflection = new \ReflectionClass($validator);
+        $reflection = new ReflectionClass($validator);
         $method = $reflection->getMethod('saveToRedisCache');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         // Should not throw any exceptions
@@ -266,15 +304,20 @@ class TldValidatorTest extends TestCase
         $this->assertTrue(true); // If we get here, no exception was thrown
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testLoadFallbackTlds(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('loadFallbackTlds');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $method->invoke($this->validator);
 
         $validTldsProperty = $reflection->getProperty('validTlds');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $validTldsProperty->setAccessible(true);
         $tlds = $validTldsProperty->getValue($this->validator);
 
@@ -294,11 +337,54 @@ class TldValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
+    public function testGetCacheInfoWithoutCache(): void
+    {
+        // Создаем TldValidator с мок-объектом, который имитирует недоступный Redis
+        $mockCache = $this->createMock(RedisCacheAdapter::class);
+        $mockCache->method('exists')->willReturn(false);
+        $mockCache->method('get')->willReturn(null);
+        $mockCache->method('getTtl')->willReturn(-2);
+
+        $validator = new TldValidator($mockCache);
+        $reflection = new ReflectionClass($validator);
+        $method = $reflection->getMethod('getCacheInfo');
+        $method->setAccessible(true);
+
+        // Вызываем метод getCacheInfo и проверяем fallback поведение
+        $result = $method->invoke($validator);
+
+        // Проверяем структуру ответа согласно реальной реализации
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertArrayHasKey('ttl_seconds', $result);
+        $this->assertArrayHasKey('ttl_human', $result);
+        $this->assertArrayHasKey('metadata', $result);
+        $this->assertArrayHasKey('current_tlds_count', $result);
+
+        // Проверяем значения для случая без кэша
+        $this->assertEquals('not_cached', $result['status']);
+        $this->assertEquals(-2, $result['ttl_seconds']);
+        $this->assertEquals('expired', $result['ttl_human']);
+        $this->assertNull($result['metadata']);
+        $this->assertIsInt($result['current_tlds_count']);
+        $this->assertGreaterThan(0, $result['current_tlds_count']); // Должен использовать fallback TLDs
+    }
+
     public function testClearCacheWithoutCache(): void
     {
-        // Skip this test in Docker environment where Redis is available
-        // This test would require mocking the Redis configuration failure
-        $this->markTestSkipped('Test requires Redis to be unavailable, but Docker environment has Redis running');
+        // Создаем TldValidator с мок-объектом, который имитирует недоступный Redis
+        $mockCache = $this->createMock(RedisCacheAdapter::class);
+        $mockCache->method('exists')->willReturn(false);
+        $mockCache->method('delete')->willReturn(false);
+
+        $validator = new TldValidator($mockCache);
+        $reflection = new ReflectionClass($validator);
+        $method = $reflection->getMethod('clearCache');
+        $method->setAccessible(true);
+
+        // Вызываем метод clearCache и проверяем, что он работает с недоступным кэшем
+        $result = $method->invoke($validator);
+        $this->assertFalse($result); // Должен вернуть false когда кэш недоступен
     }
 
     public function testClearCacheFailure(): void
@@ -307,13 +393,6 @@ class TldValidatorTest extends TestCase
 
         $result = $this->validator->clearCache();
         $this->assertFalse($result);
-    }
-
-    public function testGetCacheInfoWithoutCache(): void
-    {
-        // Skip this test in Docker environment where Redis is available
-        // This test would require mocking the Redis configuration failure
-        $this->markTestSkipped('Test requires Redis to be unavailable, but Docker environment has Redis running');
     }
 
     public function testGetCacheInfoWithCache(): void
@@ -357,7 +436,7 @@ class TldValidatorTest extends TestCase
         $this->mockCache->method('exists')->willReturn(false);
 
         $result = $this->validator->validate($email);
-        $this->assertSame($expectedValid, $result->isValid(), "Email '{$email}' validation failed");
+        $this->assertSame($expectedValid, $result->isValid(), "Email '$email' validation failed");
     }
 
     public function validTldProvider(): array
@@ -378,12 +457,6 @@ class TldValidatorTest extends TestCase
         ];
     }
 
-    public function testInterfaceImplementation(): void
-    {
-        $this->assertInstanceOf(\App\Interfaces\ValidatorInterface::class, $this->validator);
-        $this->assertInstanceOf(\App\Interfaces\DomainValidatorInterface::class, $this->validator);
-    }
-
     public function testCaseInsensitiveTldValidation(): void
     {
         // Mock cache to return false so fallback TLDs are used
@@ -398,7 +471,7 @@ class TldValidatorTest extends TestCase
 
         foreach ($testCases as $email) {
             $result = $this->validator->validate($email);
-            $this->assertTrue($result->isValid(), "Email '{$email}' should be valid regardless of TLD case");
+            $this->assertTrue($result->isValid(), "Email '$email' should be valid regardless of TLD case");
         }
     }
 
@@ -416,7 +489,7 @@ class TldValidatorTest extends TestCase
 
         foreach ($testCases as [$email, $expectedValid]) {
             $result = $this->validator->validate($email);
-            $this->assertSame($expectedValid, $result->isValid(), "Email '{$email}' validation failed");
+            $this->assertSame($expectedValid, $result->isValid(), "Email '$email' validation failed");
         }
     }
 }

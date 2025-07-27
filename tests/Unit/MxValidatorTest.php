@@ -1,14 +1,19 @@
-<?php
+<?php /** @noinspection PhpConditionAlreadyCheckedInspection */
 
 declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Models\ValidationResult;
-use App\Redis\Adapters\RedisCacheAdapter;
+use Exception;
+use ReflectionClass;
+use ReflectionException;
 use App\Validators\MxValidator;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use App\Models\ValidationResult;
+use App\Interfaces\ValidatorInterface;
+use App\Redis\Adapters\RedisCacheAdapter;
+use PHPUnit\Framework\MockObject\MockObject;
+use App\Interfaces\DomainValidatorInterface;
 
 class MxValidatorTest extends TestCase
 {
@@ -141,64 +146,85 @@ class MxValidatorTest extends TestCase
         $this->assertSame('Email должен содержать ровно один символ @', $result->reason);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testGetCachedResultWithNullCache(): void
     {
         $this->mockCache->method('get')->willReturn(null);
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('getCachedResult');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'example.com', 'test@example.com');
         $this->assertNull($result);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testGetCachedResultWithException(): void
     {
-        $this->mockCache->method('get')->willThrowException(new \Exception('Redis error'));
+        $this->mockCache->method('get')->willThrowException(new Exception('Redis error'));
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('getCachedResult');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'example.com', 'test@example.com');
         $this->assertNull($result);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testCacheResult(): void
     {
-        $this->mockCache->method('set')->willReturn(true);
+        $this->mockCache->expects($this->once())
+            ->method('set')
+            ->with('example.com', $this->isType('array'), 7200);
 
         $validationResult = ValidationResult::valid('test@example.com');
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('cacheResult');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         // Should not throw any exceptions
         $method->invoke($this->validator, 'example.com', $validationResult);
-        $this->assertTrue(true); // If we get here, no exception was thrown
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testCacheResultWithException(): void
     {
-        $this->mockCache->method('set')->willThrowException(new \Exception('Redis error'));
+        $this->mockCache->method('set')->willThrowException(new Exception('Redis error'));
+        $this->mockCache->expects($this->once())->method('set');
 
         $validationResult = ValidationResult::valid('test@example.com');
 
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('cacheResult');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         // Should not throw any exceptions (errors are logged)
         $method->invoke($this->validator, 'example.com', $validationResult);
-        $this->assertTrue(true); // If we get here, no exception was thrown
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testIsValidDomainFormatWithValidDomains(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('isValidDomainFormat');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $validDomains = [
@@ -211,14 +237,18 @@ class MxValidatorTest extends TestCase
 
         foreach ($validDomains as $domain) {
             $result = $method->invoke($this->validator, $domain);
-            $this->assertTrue($result, "Domain '{$domain}' should be valid");
+            $this->assertTrue($result, "Domain '$domain' should be valid");
         }
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testIsValidDomainFormatWithInvalidDomains(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('isValidDomainFormat');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $invalidDomains = [
@@ -233,14 +263,18 @@ class MxValidatorTest extends TestCase
 
         foreach ($invalidDomains as $domain) {
             $result = $method->invoke($this->validator, $domain);
-            $this->assertFalse($result, "Domain '{$domain}' should be invalid");
+            $this->assertFalse($result, "Domain '$domain' should be invalid");
         }
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testPerformFullValidationWithInvalidFormat(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('performFullValidation');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'invalid..domain.com', 'test@invalid..domain.com');
@@ -252,8 +286,8 @@ class MxValidatorTest extends TestCase
 
     public function testInterfaceImplementation(): void
     {
-        $this->assertInstanceOf(\App\Interfaces\ValidatorInterface::class, $this->validator);
-        $this->assertInstanceOf(\App\Interfaces\DomainValidatorInterface::class, $this->validator);
+        $this->assertInstanceOf(ValidatorInterface::class, $this->validator);
+        $this->assertInstanceOf(DomainValidatorInterface::class, $this->validator);
     }
 
     public function testValidatorWithoutCache(): void
@@ -269,11 +303,13 @@ class MxValidatorTest extends TestCase
 
     /**
      * @dataProvider domainFormatProvider
+     * @throws ReflectionException
      */
     public function testDomainFormatValidation(string $domain, bool $expectedValid, string $description): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('isValidDomainFormat');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, $domain);
@@ -360,7 +396,7 @@ class MxValidatorTest extends TestCase
         $email = 'test@example.com';
 
         // Test cache get error
-        $this->mockCache->method('get')->willThrowException(new \Exception('Cache get error'));
+        $this->mockCache->method('get')->willThrowException(new Exception('Cache get error'));
         $this->mockCache->method('set')->willReturn(true);
 
         $result = $this->validator->validateDomain($domain, $email);
@@ -371,7 +407,7 @@ class MxValidatorTest extends TestCase
         $this->validator = new MxValidator($this->mockCache);
 
         $this->mockCache->method('get')->willReturn(null);
-        $this->mockCache->method('set')->willThrowException(new \Exception('Cache set error'));
+        $this->mockCache->method('set')->willThrowException(new Exception('Cache set error'));
 
         $result = $this->validator->validateDomain($domain, $email);
         $this->assertInstanceOf(ValidationResult::class, $result);

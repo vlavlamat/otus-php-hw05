@@ -1,4 +1,4 @@
-# Базовый образ - официальный backend Alpine Linux
+# Базовый образ - официальный Nginx на Alpine Linux
 FROM nginx:stable-alpine
 
 # Добавляем пользователя backend в группу www-data

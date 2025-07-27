@@ -135,7 +135,7 @@ class ValidationResultTest extends TestCase
     public function testReadonlyProperties(): void
     {
         $result = ValidationResult::valid('test@example.com');
-        
+
         // Test that properties are readonly by checking they exist and are accessible
         $this->assertIsString($result->email);
         $this->assertIsString($result->status);
@@ -148,7 +148,7 @@ class ValidationResultTest extends TestCase
     public function testAllValidationStatuses(string $email, string $status, ?string $reason, bool $expectedValid): void
     {
         $result = new ValidationResult($email, $status, $reason);
-        
+
         $this->assertSame($email, $result->email);
         $this->assertSame($status, $result->status);
         $this->assertSame($reason, $result->reason);

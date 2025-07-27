@@ -2,18 +2,27 @@
 /vendor/
 /.composer/cache/
 
-# Node modules
+# Node modules и зависимости
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnp.*
+.eslintcache
 
-# Dist directory
-dist/
+# Директории сборки
+/dist/
+/frontend/dist/
+/public/assets/
 
-# Environment files
+# Environment файлы
+.env
 .env.local
 .env.*.local
+env/.env.dev
+env/.env.prod
+!env/.env.dev.example
+!env/.env.prod.example
 
 # Docker
 /docker/*.log
@@ -22,14 +31,14 @@ dist/
 # IDE / Редакторы
 .idea/
 .vscode/
-
-# Файлы Junie
-# .junie/
+*.sublime-*
+*.swp
+*.swo
 
 # PHPUnit
 .phpunit.result.cache
 coverage/
-
+.phpunit.cache/
 
 # Временные тестовые файлы
 /test_*.php
@@ -45,19 +54,18 @@ coverage/
 .DS_Store
 .AppleDouble
 .LSOverride
+._*
 
 # Linux
 *~
 
 # Windows
 Thumbs.db
+ehthumbs.db
 desktop.ini
 
-# Персональные и секретные конфиги
-env/.env.dev
-env/.env.*
-!env/.env.dev.example
-!env/.env.prod.example
+# Vite
+vite.config.local.js
 
 # Временные файлы кеширования Redis Cluster
 TTL

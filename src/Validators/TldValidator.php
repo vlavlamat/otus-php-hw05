@@ -11,86 +11,28 @@ use App\Redis\Adapters\RedisCacheAdapter;
 use Exception;
 
 /**
- * Валидатор TLD (Top Level Domain) email адресов с Redis кэшированием
- *
- * Проверяет доменную часть email адреса на соответствие официальному списку
- * доменов верхнего уровня, поддерживаемых IANA (Internet Assigned Numbers Authority).
- *
- * Особенности работы:
- * - Загружает актуальный список TLD с официального сайта IANA
- * - Кэширует данные в Redis Cluster для высокой производительности
- * - Имеет резервный список TLD на случай недоступности IANA и Redis
- * - Поддерживает как новое API (validateDomain), так и старое (validate)
- * - Использует распределенный кэш между всеми инстансами приложения
- *
- * @package App\Validators
- * @author Vladimir Matkovskii and Claude 4 Sonnet
- * @version 3.0
+ * Валидатор TLD с Redis кэшированием и IANA API
  */
 class TldValidator implements ValidatorInterface, DomainValidatorInterface
 {
-    /**
-     * URL для загрузки официального списка TLD от IANA
-     */
     private const IANA_TLD_URL = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt';
-
-    /**
-     * Ключ для хранения списка TLD в Redis кэше
-     */
     private const REDIS_TLD_CACHE_KEY = 'tlds_list';
-
-    /**
-     * Ключ для хранения метаданных о кэше (время загрузки, версия и т.д.)
-     */
     private const REDIS_TLD_METADATA_KEY = 'tlds_metadata';
-
-    /**
-     * Время жизни кэша в секундах (24 часа)
-     */
     private const CACHE_DURATION = 24 * 60 * 60;
-
-    /**
-     * Таймаут для HTTP запросов к IANA в секундах
-     */
     private const HTTP_TIMEOUT = 10;
-
-    /**
-     * User-Agent для HTTP запросов
-     */
     private const USER_AGENT = 'EmailValidator/3.0 (TLD Checker with Redis)';
 
-    /**
-     * Массив валидных TLD в верхнем регистре
-     *
-     * @var array<string> Список валидных TLD
-     */
     private array $validTlds = [];
-
-    /**
-     * Адаптер Redis кэша
-     */
     private readonly ?RedisCacheAdapter $cache;
 
-    /**
-     * Конструктор класса
-     *
-     * Создание Redis адаптера согласно алгоритму:
-     * - Подключение к Redis Cluster
-     * - Настройка префикса ключей: tld_cache:
-     *
-     * @param RedisCacheAdapter|null $cache Адаптер Redis кэша (для DI и тестирования)
-     */
     public function __construct(?RedisCacheAdapter $cache = null)
     {
-        // Автоматически создаем Redis адаптер если не передан (согласно алгоритму)
         if ($cache === null) {
             try {
-                // Загружаем конфигурацию для получения префикса
                 $config = require __DIR__ . '/../../config/redis.php';
                 $prefix = $config['tld_cache']['prefix'] ?? 'tld_cache:';
                 $this->cache = new RedisCacheAdapter($prefix, $config);
             } catch (Exception $e) {
-                // Если Redis недоступен, продолжаем без кэша
                 error_log("Redis cache unavailable during TldValidator initialization: " . $e->getMessage());
                 $this->cache = null;
             }
@@ -98,7 +40,6 @@ class TldValidator implements ValidatorInterface, DomainValidatorInterface
             $this->cache = $cache;
         }
 
-        // Загружаем список TLD при создании объекта
         $this->loadValidTlds();
     }
 
