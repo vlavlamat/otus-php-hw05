@@ -48,13 +48,13 @@ dev-logs:
 # ────────────────────────────────
 
 prod-up:
-	docker compose --env-file env/.env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 prod-down:
-	docker compose --env-file env/.env.prod -f docker-compose.yml -f docker-compose.prod.yml down
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 prod-logs:
-	docker compose --env-file env/.env.prod -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=100
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=100
 
 # ────────────────────────────────
 # Multi-architecture билд и пуш (единственный продакшн путь)
