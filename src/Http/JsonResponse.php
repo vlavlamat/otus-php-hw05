@@ -94,4 +94,44 @@ class JsonResponse
             ...$details
         ]);
     }
+
+    /**
+     * Получает данные ответа
+     *
+     * @return array
+     */
+    public function getData(): array
+    {
+        return $this->data;
+    }
+
+    /**
+     * Получает статус код
+     *
+     * @return int
+     */
+    public function getStatusCode(): int
+    {
+        return $this->statusCode;
+    }
+
+    /**
+     * Получает заголовки
+     *
+     * @return array
+     */
+    public function getHeaders(): array
+    {
+        return $this->headers;
+    }
+
+    /**
+     * Получает JSON строку данных
+     *
+     * @return string
+     */
+    public function getJsonContent(): string
+    {
+        return json_encode($this->data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    }
 }

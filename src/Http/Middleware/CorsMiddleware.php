@@ -6,8 +6,6 @@ namespace App\Http\Middleware;
 
 use App\Http\Response;
 
-;
-
 /**
  * Middleware для обработки CORS заголовков
  *

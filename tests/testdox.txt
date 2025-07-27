@@ -1,0 +1,248 @@
+Tld Validator (Tests\Unit\TldValidator)
+ [x] Get cache info without cache
+ [x] Clear cache without cache
+ [x] Constructor without cache
+ [x] Validate domain with valid tld
+ [x] Validate domain with invalid tld
+ [x] Validate domain with empty domain
+ [x] Validate domain with whitespace domain
+ [x] Validate domain without dot
+ [x] Validate with valid email
+ [x] Validate with empty email
+ [x] Validate with whitespace email
+ [x] Validate with no at symbol
+ [x] Validate with multiple at symbols
+ [x] Extract tld
+ [x] Is tld valid with fallback tlds
+ [x] Load from redis cache success
+ [x] Load from redis cache failure
+ [x] Load from redis cache with invalid data
+ [x] Load from redis cache with empty array
+ [x] Save to redis cache
+ [x] Save to redis cache without cache
+ [x] Load fallback tlds
+ [x] Clear cache success
+ [x] Clear cache failure
+ [x] Get cache info with cache
+ [x] Get cache info with expired cache
+ [x] Validate with various tlds with data set #0
+ [x] Validate with various tlds with data set #1
+ [x] Validate with various tlds with data set #2
+ [x] Validate with various tlds with data set #3
+ [x] Validate with various tlds with data set #4
+ [x] Validate with various tlds with data set #5
+ [x] Validate with various tlds with data set #6
+ [x] Validate with various tlds with data set #7
+ [x] Validate with various tlds with data set #8
+ [x] Case insensitive tld validation
+ [x] Complex domain structures
+
+App (Tests\Unit\App)
+ [x] Setup routes
+ [x] Run with preflight request
+ [x] Handle exception in development mode
+ [x] Handle exception in production mode
+ [x] Handle exception json format
+ [x] Run with normal request
+ [x] App initialization
+
+Cors Middleware (Tests\Unit\CorsMiddleware)
+ [x] Handle
+ [x] Handle preflight
+ [x] Is preflight with valid preflight request
+ [x] Is preflight with options but no request method
+ [x] Is preflight with non options request
+ [x] Is preflight with get request
+ [x] Is preflight with put request
+ [x] Full preflight cycle
+ [x] Is preflight with different request methods
+
+Email Validator (Tests\Unit\EmailValidator)
+ [x] Validate returns valid when all validators pass
+ [x] Validate returns invalid format when syntax fails
+ [x] Validate returns invalid tld when syntax passes tld fails
+ [x] Validate returns invalid mx when syntax tld pass mx fails
+ [x] Validation order is syntax tld mx
+ [x] Create default returns configured validator
+ [x] Get validators returns all three validators
+ [x] Constructor injects validators
+ [x] Validate handles empty email array
+ [x] Validate handles email array without full key
+
+Environment Loader (Tests\Unit\EnvironmentLoader)
+ [x] Load with valid environment variables
+ [x] Load with missing environment variables
+ [x] Load with empty environment variables
+ [x] Load with invalid app environment
+ [x] Load with development environment
+ [x] Load with production environment
+ [x] Load with combined errors
+
+Json Response (Tests\Unit\JsonResponse)
+ [x] Constructor with defaults
+ [x] Constructor with custom parameters
+ [x] Send with basic data
+ [x] Send with empty data
+ [x] Success method
+ [x] Error method with defaults
+ [x] Error method with custom parameters
+ [x] Status method without details
+ [x] Status method with details
+ [x] Send success response
+ [x] Send error response
+ [x] Send status response
+ [x] Send with russian characters
+ [x] Send with nested data
+
+Mx Validator (Tests\Unit\MxValidator)
+ [x] Constructor without cache
+ [x] Validate domain with empty domain
+ [x] Validate domain with whitespace domain
+ [x] Validate domain with cached result
+ [x] Validate domain with invalid cached result
+ [x] Validate domain with incomplete cached data
+ [x] Validate with empty email
+ [x] Validate with whitespace email
+ [x] Validate with no at symbol
+ [x] Validate with multiple at symbols
+ [x] Get cached result with null cache
+ [x] Get cached result with exception
+ [x] Cache result
+ [x] Cache result with exception
+ [x] Is valid domain format with valid domains
+ [x] Is valid domain format with invalid domains
+ [x] Perform full validation with invalid format
+ [x] Interface implementation
+ [x] Validator without cache
+ [x] Domain format validation with data set #0
+ [x] Domain format validation with data set #1
+ [x] Domain format validation with data set #2
+ [x] Domain format validation with data set #3
+ [x] Domain format validation with data set #4
+ [x] Domain format validation with data set #5
+ [x] Domain format validation with data set #6
+ [x] Domain format validation with data set #7
+ [x] Domain format validation with data set #8
+ [x] Domain format validation with data set #9
+ [x] Domain format validation with data set #10
+ [x] Domain format validation with data set #11
+ [x] Domain format validation with data set #12
+ [x] Cache integration
+ [x] Domain normalization
+ [x] Validate email extracts domain correctly
+ [x] Error handling in cache operations
+
+Redis Health Checker (Tests\Unit\RedisHealthChecker)
+ [x] Get required quorum
+ [x] Get cluster status returns correct statuses
+ [x] Is connected returns true when quorum is met
+ [x] Is connected returns false when quorum is not met
+
+Response (Tests\Unit\Response)
+ [x] Constructor with defaults
+ [x] Constructor with custom parameters
+ [x] Constructor with partial parameters
+ [x] Send with basic content
+ [x] Send with empty content
+ [x] Send with json content
+ [x] Send with different status codes
+ [x] Send with multiple headers
+ [x] Send with long content
+ [x] Send with special characters
+
+Router (Tests\Unit\Router)
+ [x] Add route and dispatch successfully
+ [x] Add route throws exception for duplicate route
+ [x] Add route throws exception for invalid path with data set "пустой путь"
+ [x] Add route throws exception for invalid path with data set "без слеша в начале"
+ [x] Add route throws exception for invalid path with data set "обход директории"
+ [x] Add route throws exception for invalid path with data set "недопустимые символы"
+ [x] Dispatch sets 404 for not found route
+ [x] Dispatch sets 404 for wrong method
+ [x] Dispatch correctly handles query string
+ [x] Dispatch sets 500 when handler throws exception
+ [x] Dispatch sets 400 for malformed uri path
+ [x] Dispatch handles null uri
+ [x] Router handles case sensitivity
+ [x] Add route normalizes http method
+ [x] Dispatch with valid path
+ [x] Add route validates path
+
+Syntax Validator (Tests\Unit\SyntaxValidator)
+ [x] Validate with valid email
+ [x] Validate with empty email
+ [x] Validate with whitespace only email
+ [x] Validate with no at symbol
+ [x] Validate with multiple at symbols
+ [x] Validate parts with valid parts
+ [x] Validate parts with invalid local part
+ [x] Validate parts with invalid domain part
+ [x] Validate with valid emails with data set #0
+ [x] Validate with valid emails with data set #1
+ [x] Validate with valid emails with data set #2
+ [x] Validate with valid emails with data set #3
+ [x] Validate with valid emails with data set #4
+ [x] Validate with valid emails with data set #5
+ [x] Validate with valid emails with data set #6
+ [x] Validate with valid emails with data set #7
+ [x] Validate with invalid local part with data set #0
+ [x] Validate with invalid local part with data set #1
+ [x] Validate with invalid local part with data set #2
+ [x] Validate with invalid local part with data set #3
+ [x] Validate with invalid local part with data set #4
+ [x] Validate with invalid domain part with data set #0
+ [x] Validate with invalid domain part with data set #1
+ [x] Validate with invalid domain part with data set #2
+ [x] Validate with invalid domain part with data set #3
+ [x] Validate with invalid domain part with data set #4
+ [x] Validate with invalid domain part with data set #5
+ [x] Validate local part empty
+ [x] Validate local part too long
+ [x] Validate local part with consecutive dots
+ [x] Validate local part starting with dot
+ [x] Validate local part ending with dot
+ [x] Validate local part valid
+ [x] Validate domain part empty
+ [x] Validate domain part too long
+ [x] Validate domain part with consecutive dots
+ [x] Validate domain part starting with dot
+ [x] Validate domain part ending with dot
+ [x] Validate domain part without dot
+ [x] Validate domain part valid
+ [x] Validate with filter var failure
+ [x] Validate parts with filter var failing email
+
+Validation Result (Tests\Unit\ValidationResult)
+ [x] Constructor with valid result
+ [x] Constructor with invalid result
+ [x] Valid static method
+ [x] Invalid format static method
+ [x] Invalid tld static method
+ [x] Invalid mx static method
+ [x] Is valid returns true for valid status
+ [x] Is valid returns false for invalid statuses
+ [x] To array with valid result
+ [x] To array with invalid result
+ [x] Readonly properties
+ [x] All validation statuses with data set "valid status"
+ [x] All validation statuses with data set "invalid_format status"
+ [x] All validation statuses with data set "invalid_tld status"
+ [x] All validation statuses with data set "invalid_mx status"
+ [x] Json serialization
+
+Comprehensive Email Validation (Tests\Feature\ComprehensiveEmailValidation)
+ [x] Validates comprehensive email scenarios
+ [x] Handles ipv 6 addresses
+ [x] Supports modern long tlds
+ [x] Supports rfc 5322 compliant syntax
+ [x] Loads iana tld list successfully
+ [x] Meets all system requirements
+
+Detailed Email Validation (Tests\Feature\DetailedEmailValidation)
+ [x] It validates emails with real domains
+ [x] It handles ipv6 domain addresses
+ [x] It rejects emails with invalid tld
+ [x] It integrates all validators correctly
+ [x] It follows fail fast validation strategy
+ [x] It handles different validation error types
+

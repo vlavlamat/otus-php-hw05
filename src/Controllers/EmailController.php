@@ -73,6 +73,7 @@ class EmailController
 
     /**
      * Получает и парсит данные из тела HTTP запроса
+     * @throws JsonException
      */
     private function getRequestData(): array
     {
@@ -84,11 +85,16 @@ class EmailController
             return [];
         }
 
-        // Парсим JSON с включенным исключением при ошибках
-        $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
+        try {
+            // Парсим JSON с включенным исключением при ошибках
+            $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
 
-        // Гарантируем, что возвращаем массив (на случай, если JSON содержит не объект)
-        return is_array($data) ? $data : [];
+            // Гарантируем, что возвращаем массив (на случай, если JSON содержит не объект)
+            return is_array($data) ? $data : [];
+        } catch (JsonException $e) {
+            // Обрабатываем ошибку парсинга JSON локально
+            throw new JsonException('Неверный формат JSON: ' . $e->getMessage(), $e->getCode(), $e);
+        }
     }
 
     /**

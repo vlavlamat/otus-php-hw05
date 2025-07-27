@@ -9,6 +9,18 @@ use App\Validators\TldValidator;
 
 /**
  * Тестовый скрипт для проверки работы TLD кэша в Redis Cluster
+ *
+ * ВАЖНО: Этот файл должен запускаться внутри контейнера PHP, а не из хост-системы!
+ *
+ * Запуск внутри контейнера:
+ * $ docker exec -it php-fpm1-hw05 php scripts/test_tld_cache.php
+ *
+ * Скрипт выполняет:
+ * 1. Инициализацию TldValidator и подключение к Redis
+ * 2. Тестирование валидации email адресов
+ * 3. Проверку операций с кэшем (обновление и информация)
+ * 4. Тестирование производительности
+ * 5. Проверку отказоустойчивости
  */
 
 echo "🔍 Тестирование TLD кэша в Redis Cluster\n";
@@ -99,7 +111,7 @@ try {
 
     $performanceEmails = [
         'user1@example.com',
-        'user2@google.com', 
+        'user2@google.com',
         'user3@microsoft.net',
         'user4@company.org',
         'user5@startup.tech'
@@ -131,23 +143,29 @@ try {
     $mockCache = new class extends RedisCacheAdapter {
         private string $keyPrefix;
 
-        public function __construct() {
+        public function __construct()
+        {
             $this->keyPrefix = 'tld_cache:';
+            parent::__construct($this->keyPrefix);
         }
 
-        public function exists(string $key): bool {
+        public function exists(string $key): bool
+        {
             return false;
         }
 
-        public function get(string $key): mixed {
+        public function get(string $key): mixed
+        {
             return null;
         }
 
-        public function set(string $key, mixed $data, int $ttl): bool {
+        public function set(string $key, mixed $data, int $ttl): bool
+        {
             return false;
         }
 
-        public function getTtl(string $key): int {
+        public function getTtl(string $key): int
+        {
             return -2;
         }
     };

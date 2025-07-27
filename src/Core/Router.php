@@ -117,7 +117,7 @@ class Router
 
         // Если маршрут не найден, возвращаем ошибку 404
         http_response_code(404);
-        echo json_encode(['error' => 'Маршрут не найден.302'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['error' => 'Маршрут не найден'], JSON_UNESCAPED_UNICODE);
     }
 
     private function isValidPath(string $path): bool

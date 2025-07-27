@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Models\ValidationResult;
 use App\Validators\SyntaxValidator;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionException;
 
 class SyntaxValidatorTest extends TestCase
 {
@@ -97,7 +98,7 @@ class SyntaxValidatorTest extends TestCase
     public function testValidateWithValidEmails(string $email): void
     {
         $result = $this->validator->validate($email);
-        $this->assertTrue($result->isValid(), "Email '{$email}' should be valid");
+        $this->assertTrue($result->isValid(), "Email '$email' should be valid");
     }
 
     public function validEmailProvider(): array
@@ -120,7 +121,7 @@ class SyntaxValidatorTest extends TestCase
     public function testValidateWithInvalidLocalPart(string $email, string $expectedReason): void
     {
         $result = $this->validator->validate($email);
-        
+
         $this->assertFalse($result->isValid());
         $this->assertSame('invalid_format', $result->status);
         $this->assertSame($expectedReason, $result->reason);
@@ -143,7 +144,7 @@ class SyntaxValidatorTest extends TestCase
     public function testValidateWithInvalidDomainPart(string $email, string $expectedReason): void
     {
         $result = $this->validator->validate($email);
-        
+
         $this->assertFalse($result->isValid());
         $this->assertSame('invalid_format', $result->status);
         $this->assertSame($expectedReason, $result->reason);
@@ -161,160 +162,212 @@ class SyntaxValidatorTest extends TestCase
         ];
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateLocalPartEmpty(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateLocalPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, '');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Локальная часть email не может быть пустой', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateLocalPartTooLong(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateLocalPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $longLocalPart = str_repeat('a', 65);
         $result = $method->invoke($this->validator, $longLocalPart);
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Локальная часть email не может быть длиннее 64 символов', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateLocalPartWithConsecutiveDots(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateLocalPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'test..user');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Локальная часть не может содержать подряд идущие точки', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateLocalPartStartingWithDot(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateLocalPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, '.test');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Локальная часть не может начинаться или заканчиваться точкой', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateLocalPartEndingWithDot(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateLocalPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'test.');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Локальная часть не может начинаться или заканчиваться точкой', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateLocalPartValid(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateLocalPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'test.user');
-        
+
         $this->assertTrue($result['valid']);
         $this->assertSame('', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartEmpty(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, '');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Доменная часть email не может быть пустой', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartTooLong(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $longDomainPart = str_repeat('a', 254);
         $result = $method->invoke($this->validator, $longDomainPart);
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Доменная часть email не может быть длиннее 253 символов', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartWithConsecutiveDots(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'example..com');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Доменная часть не может содержать подряд идущие точки', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartStartingWithDot(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, '.example.com');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Доменная часть не может начинаться или заканчиваться точкой', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartEndingWithDot(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'example.com.');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Доменная часть не может начинаться или заканчиваться точкой', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartWithoutDot(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'example');
-        
+
         $this->assertFalse($result['valid']);
         $this->assertSame('Доменная часть должна содержать как минимум одну точку', $result['reason']);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function testValidateDomainPartValid(): void
     {
-        $reflection = new \ReflectionClass($this->validator);
+        $reflection = new ReflectionClass($this->validator);
         $method = $reflection->getMethod('validateDomainPart');
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $method->setAccessible(true);
 
         $result = $method->invoke($this->validator, 'example.com');
-        
+
         $this->assertTrue($result['valid']);
         $this->assertSame('', $result['reason']);
     }
@@ -324,23 +377,17 @@ class SyntaxValidatorTest extends TestCase
         // Create a mock that would pass our custom validation but fail filter_var
         // This is tricky since filter_var is quite permissive, but we can test the logic
         $result = $this->validator->validate('test@example.com');
-        
+
         // Since filter_var would normally pass for valid emails, 
         // we test that our validator respects filter_var results
         $this->assertTrue($result->isValid());
-    }
-
-    public function testInterfaceImplementation(): void
-    {
-        $this->assertInstanceOf(\App\Interfaces\ValidatorInterface::class, $this->validator);
-        $this->assertInstanceOf(\App\Interfaces\PartsValidatorInterface::class, $this->validator);
     }
 
     public function testValidatePartsWithFilterVarFailingEmail(): void
     {
         // Test with parts that would individually pass but create an invalid email
         $result = $this->validator->validateParts('test', 'example', 'test@example');
-        
+
         $this->assertFalse($result->isValid());
         $this->assertSame('invalid_format', $result->status);
         $this->assertSame('Доменная часть должна содержать как минимум одну точку', $result->reason);

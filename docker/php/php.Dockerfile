@@ -65,7 +65,7 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
 # --no-scripts - пропуск выполнения скриптов, определенных в composer.json
 # --no-dev - пропуск установки dev-зависимостей (только для prod-варианта)
 
-# Копируем оставишеся файлы проекта
+# Копируем оставшиеся файлы проекта
 COPY ./src /app/src
 COPY ./public /app/public
 COPY ./config /app/config

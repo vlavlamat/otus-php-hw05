@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          cacheResultFile=".phpunit.result.cache"
          executionOrder="depends,defects"
-         forceCoversAnnotation="false"
          beStrictAboutCoversAnnotation="true"
          beStrictAboutOutputDuringTests="true"
          beStrictAboutTodoAnnotatedTests="true"
@@ -13,13 +12,13 @@
          verbose="true">
     <testsuites>
         <testsuite name="Unit">
-            <directory suffix="Test.php">./tests/Unit</directory>
+            <directory>./tests/Unit</directory>
         </testsuite>
         <testsuite name="Integration">
-            <directory suffix="Test.php">./tests/Integration</directory>
+            <directory>./tests/Integration</directory>
         </testsuite>
         <testsuite name="Feature">
-            <directory suffix="Test.php">./tests/Feature</directory>
+            <directory>./tests/Feature</directory>
         </testsuite>
     </testsuites>
 
@@ -41,12 +40,12 @@
     <php>
         <env name="APP_ENV" value="testing"/>
 
-        <!-- Mock Redis Cluster настройки для тестирования -->
-        <!-- Используем localhost узлы для mock Redis вместо реального кластера -->
-        <env name="REDIS_CLUSTER_NODES" value="127.0.0.1:6379"/>
-        <env name="REDIS_QUORUM" value="1"/>
-        <env name="REDIS_TIMEOUT" value="1"/>
-        <env name="REDIS_READ_TIMEOUT" value="1"/>
+        <!-- Redis Cluster настройки для тестирования -->
+        <!-- Используем реальные имена узлов Redis кластера из внешней сети -->
+        <env name="REDIS_CLUSTER_NODES" value="redis-node1:6379,redis-node2:6379,redis-node3:6379,redis-node4:6379,redis-node5:6379"/>
+        <env name="REDIS_QUORUM" value="2"/>
+        <env name="REDIS_TIMEOUT" value="2"/>
+        <env name="REDIS_READ_TIMEOUT" value="2"/>
 
         <!-- Настройки кэширования для тестов -->
         <env name="REDIS_TLD_CACHE_TTL" value="60"/>
@@ -61,9 +60,15 @@
         <!-- Настройки мониторинга для тестов -->
         <env name="REDIS_CHECK_INTERVAL" value="5"/>
         <env name="REDIS_PING_TIMEOUT" value="1"/>
+
+        <!-- Скрываем error_log в тестах -->
+        <ini name="log_errors" value="0"/>
+        <ini name="error_log" value="/dev/null"/>
+
     </php>
 
     <logging>
-        <junit outputFile="coverage/junit.xml"/>
+        <!-- Отключаем вывод в stderr для тестов -->
+        <testdoxText outputFile="tests/testdox.txt"/>
     </logging>
 </phpunit>

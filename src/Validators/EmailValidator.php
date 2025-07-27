@@ -8,7 +8,7 @@ use App\Models\ValidationResult;
 
 /**
  * Композитный валидатор email адресов
- * 
+ *
  * Объединяет синтаксическую, TLD и MX валидацию с fail-fast стратегией
  */
 class EmailValidator
@@ -31,24 +31,26 @@ class EmailValidator
     /**
      * Валидация email с fail-fast стратегией
      */
-    public function validate(string $email): ValidationResult
+    public function validate(array $email): ValidationResult
     {
-        $syntaxResult = $this->syntaxValidator->validate($email);
+        $emailString = $email['full'] ?? '';
+        
+        $syntaxResult = $this->syntaxValidator->validate($emailString);
         if (!$syntaxResult->isValid()) {
             return $syntaxResult;
         }
 
-        $tldResult = $this->tldValidator->validate($email);
+        $tldResult = $this->tldValidator->validate($emailString);
         if (!$tldResult->isValid()) {
             return $tldResult;
         }
 
-        $mxResult = $this->mxValidator->validate($email);
+        $mxResult = $this->mxValidator->validate($emailString);
         if (!$mxResult->isValid()) {
             return $mxResult;
         }
 
-        return ValidationResult::valid($email);
+        return ValidationResult::valid($emailString);
     }
 
 
