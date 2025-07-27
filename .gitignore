@@ -52,7 +52,7 @@ Thumbs.db
 # ====================================
 .env.dev
 .env.prod
-!env/.env.example
+!env/.env.prod.example
 
 # ====================================
 # Прочее
