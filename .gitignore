@@ -43,6 +43,7 @@ coverage/
 # Временные тестовые файлы
 /test_*.php
 /test_*.html
+tests/testdox.txt
 
 # Логи и временные файлы
 *.log
