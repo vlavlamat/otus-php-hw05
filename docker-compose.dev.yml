@@ -26,7 +26,7 @@ services:
       - ./scripts:/app/scripts
       - ./phpunit.xml:/app/phpunit.xml
       - ./coverage:/app/coverage
-      - ./php/php.ini.dev:/usr/local/etc/php/conf.d/local.ini
+      - ./php/dev.php.ini:/usr/local/etc/php/conf.d/local.ini
     environment:
       - COMPOSER_HOME=/var/www/.composer
 
@@ -40,7 +40,7 @@ services:
       - ./scripts:/app/scripts
       - ./phpunit.xml:/app/phpunit.xml
       - ./coverage:/app/coverage
-      - ./php/php.ini.dev:/usr/local/etc/php/conf.d/local.ini
+      - ./php/dev.php.ini:/usr/local/etc/php/conf.d/local.ini
     environment:
       - COMPOSER_HOME=/var/www/.composer
 
